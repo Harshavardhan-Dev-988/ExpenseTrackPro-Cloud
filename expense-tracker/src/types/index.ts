@@ -87,7 +87,11 @@ export type CategoryType =
   | 'school_fees'
   | 'tuition_classes'
   
-  // Travel & Leisure (1)
+  // Travel & Leisure (5)
+  | 'travel_flights'
+  | 'travel_hotels'
+  | 'travel_local_transport'
+  | 'travel_activities'
   | 'travel_vacation'
   
   // Household Services (5)

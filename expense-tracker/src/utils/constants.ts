@@ -2,77 +2,97 @@
 import type { CategoryGroup, CategoryType } from '../types/index';
 
 export const CATEGORY_GROUPS: CategoryGroup[] = [
-  { 
-    name: 'Grocery & Dining', 
-    icon: '🍽️', 
-    categories: ['grocery', 'dine_out', 'coffee_snacks', 'milk_dairy', 'street_food'], 
-    color: '#FF6B6B' 
+  {
+    name: 'Groceries',
+    icon: '🛒',
+    // Household grocery runs, whether at a store or via a quick-commerce
+    // app — Zepto and Blinkit deliver the same milk-and-vegetables basket
+    // a supermarket trip would, so they belong here rather than lumped in
+    // with restaurant spend.
+    categories: ['grocery', 'milk_dairy', 'ecommerce_zepto', 'ecommerce_blinkit'],
+    color: '#6B8F71'
   },
-  { 
-    name: 'Fuel & Transportation', 
-    icon: '🚗', 
-    categories: ['fuel', 'public_transport', 'auto_rickshaw', 'vehicle_maintenance', 'vehicle_rto_fees', 'parking_fees'], 
-    color: '#4ECDC4' 
+  {
+    name: 'Dining & Takeout',
+    icon: '🍽️',
+    // Eating out is not grocery shopping — split into its own group so
+    // "how much did we spend on food we didn't cook" is its own number.
+    categories: ['dine_out', 'coffee_snacks', 'street_food', 'ecommerce_zomato'],
+    color: '#B3492F'
   },
-  { 
-    name: 'Home & Bills', 
-    icon: '🏠', 
-    categories: ['bills_power', 'bills_wifi', 'bills_mobile', 'bills_water', 'bills_lpg_gas', 'bills_dth_cable', 'mobile_recharge', 'rent_mortgage'], 
-    color: '#45B7D1' 
+  {
+    name: 'Fuel & Transportation',
+    icon: '🚗',
+    categories: ['fuel', 'public_transport', 'auto_rickshaw', 'vehicle_maintenance', 'vehicle_rto_fees', 'parking_fees'],
+    color: '#5C7A8A'
   },
-  { 
-    name: 'Lifestyle & Entertainment', 
-    icon: '🛍️', 
-    categories: ['shopping_clothes', 'shopping_electronics', 'entertainment', 'subscriptions', 'personal_care', 'fitness_gym', 'salon_beauty', 'tailor_alterations', 'laundry_dryclean'], 
-    color: '#FFA07A' 
+  {
+    name: 'Home & Bills',
+    icon: '🏠',
+    categories: ['bills_power', 'bills_wifi', 'bills_mobile', 'bills_water', 'bills_lpg_gas', 'bills_dth_cable', 'mobile_recharge', 'rent_mortgage'],
+    color: '#45B7D1'
   },
-  { 
-    name: 'Online Shopping & Food Delivery', 
-    icon: '📱', 
-    categories: ['ecommerce_blinkit', 'ecommerce_zepto', 'ecommerce_zomato', 'ecommerce_flipkart', 'ecommerce_amazon'], 
-    color: '#FF8C42' 
+  {
+    name: 'Shopping',
+    icon: '🛍️',
+    // Retail purchases — clothing, electronics, and general online
+    // marketplaces — kept apart from Lifestyle's recurring services.
+    categories: ['shopping_clothes', 'shopping_electronics', 'ecommerce_flipkart', 'ecommerce_amazon'],
+    color: '#C9A66B'
   },
-  { 
-    name: 'Medical Expenses', 
-    icon: '🏥', 
-    categories: ['medical_consultation', 'medical_medicines', 'medical_tests', 'medical_hospitalization', 'medical_insurance', 'medical_dental', 'medical_pharmacy', 'medical_emergency'], 
-    color: '#98D8C8' 
+  {
+    name: 'Lifestyle & Entertainment',
+    icon: '🎬',
+    categories: ['entertainment', 'subscriptions', 'personal_care', 'fitness_gym', 'salon_beauty', 'tailor_alterations', 'laundry_dryclean'],
+    color: '#7C6A9C'
   },
-  { 
-    name: 'Gifting & Donations', 
-    icon: '🎁', 
-    categories: ['gifting_personal', 'gifting_festivals', 'gifting_weddings', 'donations_charity', 'donations_religious'], 
-    color: '#F7DC6F' 
+  {
+    name: 'Medical Expenses',
+    icon: '🏥',
+    categories: ['medical_consultation', 'medical_medicines', 'medical_tests', 'medical_hospitalization', 'medical_insurance', 'medical_dental', 'medical_pharmacy', 'medical_emergency'],
+    color: '#98D8C8'
   },
-  { 
-    name: 'Agriculture & Farming', 
-    icon: '🌾', 
-    categories: ['agri_seeds_fertilizers', 'agri_seeds', 'agri_fertilizers', 'agri_pesticides', 'agri_equipment', 'agri_irrigation', 'agri_livestock', 'agri_labor', 'agri_fuel', 'agri_tractor_rental', 'agri_harvester_rental', 'agri_machinery_rental', 'agri_land_lease', 'agri_crop_insurance', 'agri_loan_interest', 'agri_storage_transport', 'agri_other'], 
-    color: '#82B74B' 
+  {
+    name: 'Gifting & Donations',
+    icon: '🎁',
+    categories: ['gifting_personal', 'gifting_festivals', 'gifting_weddings', 'donations_charity', 'donations_religious'],
+    color: '#8C5A5A'
   },
-  { 
-    name: 'Education', 
-    icon: '📚', 
-    categories: ['education', 'school_fees', 'tuition_classes'], 
-    color: '#9B59B6' 
+  {
+    name: 'Agriculture & Farming',
+    icon: '🌾',
+    categories: ['agri_seeds_fertilizers', 'agri_seeds', 'agri_fertilizers', 'agri_pesticides', 'agri_equipment', 'agri_irrigation', 'agri_livestock', 'agri_labor', 'agri_fuel', 'agri_tractor_rental', 'agri_harvester_rental', 'agri_machinery_rental', 'agri_land_lease', 'agri_crop_insurance', 'agri_loan_interest', 'agri_storage_transport', 'agri_other'],
+    color: '#82B74B'
   },
-  { 
-    name: 'Travel', 
-    icon: '✈️', 
-    categories: ['travel_vacation'], 
-    color: '#3498DB' 
+  {
+    name: 'Education',
+    icon: '📚',
+    categories: ['education', 'school_fees', 'tuition_classes'],
+    color: '#9B59B6'
   },
-  { 
-    name: 'Household Services', 
-    icon: '🏡', 
-    categories: ['domestic_help_maid', 'domestic_help_cook', 'domestic_help_driver', 'home_repairs', 'home_furnishing'], 
-    color: '#D4A373' 
+  {
+    name: 'Travel',
+    icon: '✈️',
+    // Broken out by what the money actually went to — flights, stay,
+    // getting around, and doing things — instead of one catch-all
+    // "vacation" bucket that hides where a trip's budget really goes.
+    // travel_vacation stays as a general/legacy bucket for anything that
+    // doesn't fit the four specific ones (and for entries recorded before
+    // this split).
+    categories: ['travel_flights', 'travel_hotels', 'travel_local_transport', 'travel_activities', 'travel_vacation'],
+    color: '#3E6E7E'
   },
-  { 
-    name: 'Financial & Others', 
-    icon: '💰', 
-    categories: ['insurance_general', 'investments_savings', 'pets', 'household_maintenance', 'other'], 
-    color: '#95A5A6' 
+  {
+    name: 'Household Services',
+    icon: '🏡',
+    categories: ['domestic_help_maid', 'domestic_help_cook', 'domestic_help_driver', 'home_repairs', 'home_furnishing'],
+    color: '#D4A373'
+  },
+  {
+    name: 'Financial & Others',
+    icon: '💰',
+    categories: ['insurance_general', 'investments_savings', 'pets', 'household_maintenance', 'other'],
+    color: '#95A5A6'
   },
 ];
 
@@ -162,7 +182,11 @@ export const CATEGORY_LABELS: Record<CategoryType, string> = {
   tuition_classes: 'Tuition Classes',
   
   // Travel
-  travel_vacation: 'Travel & Vacation',
+  travel_flights: 'Flights & Airfare',
+  travel_hotels: 'Hotels & Stay',
+  travel_local_transport: 'Local Transport (Trip)',
+  travel_activities: 'Activities & Sightseeing',
+  travel_vacation: 'Other Travel',
   
   // Household Services
   domestic_help_maid: 'Maid/House Help',

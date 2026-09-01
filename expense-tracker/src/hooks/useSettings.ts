@@ -2,11 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Settings } from '../types';
 import db from '../services/db';
 
+// The category taxonomy (UPI, agri_* categories, festival gifting, PPF/NPS
+// savings) and every hardcoded formatter elsewhere in this app assume an
+// Indian household, so that's the sensible default for a first run —
+// matches what the dashboard actually displayed before this redesign made
+// currency formatting consistently respect this setting.
 const DEFAULT_SETTINGS: Settings = {
-  currency: 'USD',
-  dateFormat: 'MM/DD/YYYY',
+  currency: 'INR',
+  dateFormat: 'DD/MM/YYYY',
   theme: 'system',
-  locale: 'en-US',
+  locale: 'en-IN',
 };
 
 export const useSettings = () => {

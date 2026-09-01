@@ -153,21 +153,21 @@ export default function PDFReportGenerator({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:rounded-full dark:[&::-webkit-scrollbar-track]:bg-gray-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 hover:[&::-webkit-scrollbar-thumb]:bg-gray-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-gray-500">
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 z-10">
+    <div className="fixed inset-0 bg-ink/50 flex items-center justify-center z-50 p-4">
+      <div className="card-surface w-full max-w-3xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-paper [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate">
+        <div className="sticky top-0 bg-surface border-b border-line px-6 py-4 z-10 rounded-t-ledger">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              📄 Generate PDF Report
+            <h2 className="font-display text-2xl font-semibold text-ink">
+              📄 Generate PDF report
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
+              className="text-slate hover:text-ink transition-colors text-2xl leading-none"
             >
               ×
             </button>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-slate mt-1">
             Create a comprehensive PDF report of your expenses
           </p>
         </div>
@@ -175,50 +175,50 @@ export default function PDFReportGenerator({
         <div className="p-6 space-y-6">
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+            <div className="bg-ember/10 border border-ember/30 rounded-lg p-4">
+              <p className="text-ember-strong dark:text-ember text-sm">{error}</p>
             </div>
           )}
 
           {/* Report Type Selection */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-5">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-              Report Type
+          <div className="bg-paper rounded-lg p-5">
+            <h3 className="font-display text-lg font-semibold text-ink mb-3">
+              Report type
             </h3>
             <div className="space-y-2">
-              <label className="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition">
+              <label className="flex items-start gap-3 p-3 border-2 border-line rounded-lg cursor-pointer hover:border-pine transition-colors">
                 <input
                   type="radio"
                   name="reportType"
                   value="simple"
                   checked={reportType === 'simple'}
                   onChange={(e) => setReportType(e.target.value as 'simple')}
-                  className="mt-1"
+                  className="mt-1 accent-pine"
                 />
                 <div>
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    📊 Simple Report (Recommended)
+                  <div className="font-medium text-ink">
+                    📊 Simple report (recommended)
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-slate">
                     Text-based summary with KPIs, top categories, and payment methods. Fast and
                     reliable.
                   </div>
                 </div>
               </label>
-              <label className="flex items-start gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30 transition">
+              <label className="flex items-start gap-3 p-3 border-2 border-line rounded-lg cursor-pointer hover:border-pine transition-colors">
                 <input
                   type="radio"
                   name="reportType"
                   value="full"
                   checked={reportType === 'full'}
                   onChange={(e) => setReportType(e.target.value as 'full')}
-                  className="mt-1"
+                  className="mt-1 accent-pine"
                 />
                 <div>
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    📈 Full Report with Charts
+                  <div className="font-medium text-ink">
+                    📈 Full report with charts
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-slate">
                     Multi-page report with captured charts and detailed insights. May take longer
                     to generate.
                   </div>
@@ -229,64 +229,64 @@ export default function PDFReportGenerator({
 
           {/* Section Selection (only for full report) */}
           {reportType === 'full' && (
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-5">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                Include Sections
+            <div className="bg-paper rounded-lg p-5">
+              <h3 className="font-display text-lg font-semibold text-ink mb-3">
+                Include sections
               </h3>
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSections.summary}
                     onChange={() => handleSectionToggle('summary')}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-pine"
                   />
-                  <span className="text-gray-900 dark:text-white">
-                    📊 Executive Summary (KPIs & Overview)
+                  <span className="text-ink">
+                    📊 Executive summary (KPIs & overview)
                   </span>
                 </label>
-                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSections.categories}
                     onChange={() => handleSectionToggle('categories')}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-pine"
                   />
-                  <span className="text-gray-900 dark:text-white">
-                    📈 Category Analysis (Pie Chart & Breakdown)
+                  <span className="text-ink">
+                    📈 Category analysis (pie chart & breakdown)
                   </span>
                 </label>
-                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSections.trends}
                     onChange={() => handleSectionToggle('trends')}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-pine"
                   />
-                  <span className="text-gray-900 dark:text-white">
-                    📉 Time Trends (Monthly Spending Chart)
+                  <span className="text-ink">
+                    📉 Time trends (monthly spending chart)
                   </span>
                 </label>
-                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSections.payments}
                     onChange={() => handleSectionToggle('payments')}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-pine"
                   />
-                  <span className="text-gray-900 dark:text-white">
-                    💳 Payment Methods (Distribution Chart)
+                  <span className="text-ink">
+                    💳 Payment methods (distribution chart)
                   </span>
                 </label>
-                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30">
+                <label className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-surface transition-colors">
                   <input
                     type="checkbox"
                     checked={includeSections.daily}
                     onChange={() => handleSectionToggle('daily')}
-                    className="w-4 h-4"
+                    className="w-4 h-4 accent-pine"
                   />
-                  <span className="text-gray-900 dark:text-white">
-                    📅 Daily Expenses (Current Month Detail)
+                  <span className="text-ink">
+                    📅 Daily expenses (current month detail)
                   </span>
                 </label>
               </div>
@@ -294,24 +294,24 @@ export default function PDFReportGenerator({
           )}
 
           {/* Report Info */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Report Info</h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="bg-paper rounded-lg p-4">
+            <h4 className="font-display font-semibold text-ink mb-2">Report info</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm font-mono">
               <div>
-                <span className="text-gray-500 dark:text-gray-400">Expenses:</span>
-                <p className="font-medium text-gray-900 dark:text-white">{expenses.length}</p>
+                <span className="text-slate">Expenses:</span>
+                <p className="font-medium text-ink tabular">{expenses.length}</p>
               </div>
               <div>
-                <span className="text-gray-500 dark:text-gray-400">Date:</span>
-                <p className="font-medium text-gray-900 dark:text-white">
+                <span className="text-slate">Date:</span>
+                <p className="font-medium text-ink tabular">
                   {format(new Date(), 'MMM dd, yyyy')}
                 </p>
               </div>
               {expenses.length > 0 && (
                 <>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Period Start:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-slate">Period start:</span>
+                    <p className="font-medium text-ink tabular">
                       {format(
                         new Date(Math.min(...expenses.map((e) => new Date(e.date).getTime()))),
                         'MMM dd, yyyy'
@@ -319,8 +319,8 @@ export default function PDFReportGenerator({
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Period End:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-slate">Period end:</span>
+                    <p className="font-medium text-ink tabular">
                       {format(
                         new Date(Math.max(...expenses.map((e) => new Date(e.date).getTime()))),
                         'MMM dd, yyyy'
@@ -336,28 +336,28 @@ export default function PDFReportGenerator({
           {reportType === 'full' && (
             <div className="hidden">
               <div ref={categoryChartRef} style={{ width: '800px', padding: '20px' }}>
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#000' }}>
+                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#17211D' }}>
                   Category Distribution
                 </h3>
-                <CategoryPieChart 
-                  categoryStats={categoryStats.filter(stat => stat.total > 0)} 
-                  currency={settings.currency} 
+                <CategoryPieChart
+                  categoryStats={categoryStats.filter(stat => stat.total > 0)}
+                  currency={settings.currency}
                 />
               </div>
               <div ref={trendChartRef} style={{ width: '800px', padding: '20px' }}>
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#000' }}>
+                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#17211D' }}>
                   Monthly Spending Trend
                 </h3>
                 <MonthlyTrendChart expenses={expenses} currency={settings.currency} />
               </div>
               <div ref={paymentChartRef} style={{ width: '800px', padding: '20px' }}>
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#000' }}>
+                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#17211D' }}>
                   Payment Method Distribution
                 </h3>
                 <PaymentMethodChart expenses={expenses} currency={settings.currency} />
               </div>
               <div ref={dailyChartRef} style={{ width: '800px', padding: '20px' }}>
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#000' }}>
+                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#17211D' }}>
                   Daily Expenses (Current Month)
                 </h3>
                 <DailyExpensesChart expenses={expenses} />
@@ -369,7 +369,7 @@ export default function PDFReportGenerator({
           <button
             onClick={handleGeneratePDF}
             disabled={loading || expenses.length === 0}
-            className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition font-medium shadow-lg text-lg"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg bg-pine text-paper text-lg font-semibold shadow-ledger hover:bg-pine-strong disabled:bg-line disabled:text-slate disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-200"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -396,22 +396,22 @@ export default function PDFReportGenerator({
                 Generating PDF...
               </span>
             ) : (
-              '📥 Download PDF Report'
+              '📥 Download PDF report'
             )}
           </button>
 
           {expenses.length === 0 && (
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-center text-sm text-slate">
               Add some expenses first to generate a report
             </p>
           )}
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+        <div className="sticky bottom-0 bg-paper px-6 py-4 border-t border-line rounded-b-ledger">
           <button
             onClick={onClose}
             disabled={loading}
-            className="w-full px-6 py-3 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition font-medium"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-line bg-surface text-ink text-sm font-medium hover:border-pine hover:text-pine-strong disabled:bg-line disabled:text-slate disabled:cursor-not-allowed active:scale-[0.98] transition-all duration-200"
           >
             Close
           </button>

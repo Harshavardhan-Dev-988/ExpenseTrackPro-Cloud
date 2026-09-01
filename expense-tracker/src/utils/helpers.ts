@@ -1,8 +1,42 @@
 import type { Expense, CategoryType } from '../types';
 import { format, parse, isValid } from 'date-fns';
+import { CATEGORY_GROUPS } from './constants';
+
+/** Which of the CATEGORY_GROUPS a category belongs to — used to give
+ * every category a consistent icon and group color across the redesigned UI. */
+export const getCategoryGroup = (category: CategoryType) =>
+  CATEGORY_GROUPS.find((group) => group.categories.includes(category));
+
+export const getCategoryIcon = (category: CategoryType): string =>
+  getCategoryGroup(category)?.icon || '💰';
 
 export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Locale-aware money formatting used across the redesigned UI — picks a
+// sensible locale for the currency and drops decimals on whole amounts so
+// tables of numbers line up cleanly.
+const CURRENCY_LOCALES: Record<string, string> = {
+  INR: 'en-IN',
+  USD: 'en-US',
+  EUR: 'de-DE',
+  GBP: 'en-GB',
+};
+
+export const formatMoney = (
+  amount: number,
+  currency: string = 'INR',
+  options?: { alwaysShowDecimals?: boolean }
+): string => {
+  const locale = CURRENCY_LOCALES[currency] || 'en-IN';
+  const hasFraction = Math.abs(amount % 1) > 0.001;
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: options?.alwaysShowDecimals ? 2 : hasFraction ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
 };
 
 export const formatCurrency = (

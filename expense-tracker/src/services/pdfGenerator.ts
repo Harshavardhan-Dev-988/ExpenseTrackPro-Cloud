@@ -23,8 +23,8 @@ function addHeader(doc: jsPDF, pageNumber: number, totalPages: number) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Header background
-  doc.setFillColor(59, 130, 246);
+  // Header background — ledger pine
+  doc.setFillColor(47, 77, 63);
   doc.rect(0, 0, pageWidth, 20, 'F');
 
   // Title
@@ -38,8 +38,8 @@ function addHeader(doc: jsPDF, pageNumber: number, totalPages: number) {
   doc.setFont('helvetica', 'normal');
   doc.text(format(new Date(), 'MMM dd, yyyy'), pageWidth - 15, 13, { align: 'right' });
 
-  // Footer
-  doc.setTextColor(100, 100, 100);
+  // Footer — ledger slate
+  doc.setTextColor(92, 107, 100);
   doc.setFontSize(8);
   doc.text(
     `Page ${pageNumber} of ${totalPages}`,
@@ -55,7 +55,7 @@ function addHeader(doc: jsPDF, pageNumber: number, totalPages: number) {
 function addSectionTitle(doc: jsPDF, title: string, yPos: number): number {
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 138);
+  doc.setTextColor(36, 60, 49); // ledger pine-strong
   doc.text(title, 15, yPos);
   return yPos + 8;
 }
@@ -160,17 +160,17 @@ function generateSummaryPage(
     {
       label: 'Total Expenses',
       value: `₹${stats.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      color: [239, 68, 68] as [number, number, number],
+      color: [47, 77, 63] as [number, number, number], // ledger pine
     },
     {
       label: 'Transactions',
       value: stats.count.toString(),
-      color: [59, 130, 246] as [number, number, number],
+      color: [169, 118, 46] as [number, number, number], // ledger brass
     },
     {
       label: 'Average Expense',
       value: `₹${stats.average.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-      color: [34, 197, 94] as [number, number, number],
+      color: [36, 60, 49] as [number, number, number], // ledger pine-strong
     },
   ];
 
@@ -194,7 +194,7 @@ function generateSummaryPage(
     const dates = expenses.map(e => new Date(e.date));
     const earliest = new Date(Math.min(...dates.map(d => d.getTime())));
     const latest = new Date(Math.max(...dates.map(d => d.getTime())));
-    doc.setTextColor(100, 100, 100);
+    doc.setTextColor(92, 107, 100); // ledger slate
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(
@@ -208,14 +208,14 @@ function generateSummaryPage(
   // Top Categories
   yPos = addSectionTitle(doc, 'Top Spending Categories', yPos);
   yPos += 5;
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(23, 33, 29); // ledger ink
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
 
   stats.categoryStats.slice(0, 8).forEach((cat) => {
     const barWidth = (cat.percentage / 100) * (pageWidth - 100);
     doc.text(cat.label.substring(0, 20), 15, yPos + 4);
-    doc.setFillColor(59, 130, 246);
+    doc.setFillColor(47, 77, 63); // ledger pine
     doc.rect(70, yPos, barWidth, 6, 'F');
     doc.text(
       `₹${cat.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${cat.percentage.toFixed(1)}%)`,
@@ -282,7 +282,7 @@ function addChartPage(
     yPos += imgHeight + 10;
   } catch (error) {
     console.error('Failed to add chart image:', error);
-    doc.setTextColor(200, 50, 50);
+    doc.setTextColor(179, 73, 47); // ledger ember — error state
     doc.setFontSize(10);
     doc.text('Chart could not be generated', pageWidth / 2, yPos + 60, { align: 'center' });
     yPos += imgHeight + 10;
@@ -292,13 +292,13 @@ function addChartPage(
   if (insights && insights.length > 0 && yPos < 240) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 58, 138);
+    doc.setTextColor(36, 60, 49); // ledger pine-strong
     doc.text('Key Insights:', 15, yPos);
     yPos += 8;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(23, 33, 29); // ledger ink
 
     insights.forEach((insight) => {
       if (yPos < 270) {
@@ -408,7 +408,7 @@ export async function generateSimplePDFReport(config: PDFReportConfig): Promise<
     if (config.expenses.length === 0) {
       addHeader(doc, 1, 1);
       doc.setFontSize(14);
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(92, 107, 100); // ledger slate
       doc.text('No expenses to report', doc.internal.pageSize.getWidth() / 2, 100, { align: 'center' });
     } else {
       generateSummaryPage(doc, config.expenses, stats, 1, 1);

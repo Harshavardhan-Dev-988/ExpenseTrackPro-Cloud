@@ -96,8 +96,11 @@ export default function ExpenseFilters({ filters, onFilterChange }: ExpenseFilte
 
   const hasActiveFilters = activeFilterCount > 0;
 
+  const ledgerInput = 'w-full px-3 py-2 border border-line rounded-lg bg-surface text-ink placeholder:text-slate/70 focus:outline-none focus:border-pine transition-colors';
+  const ledgerLabel = 'block text-xs font-medium text-slate mb-1.5';
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+    <div className="card-surface p-4 mb-6">
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <div className="flex-1 min-w-[200px]">
           <input
@@ -105,16 +108,16 @@ export default function ExpenseFilters({ filters, onFilterChange }: ExpenseFilte
             value={searchText}
             onChange={(e) => handleFilterUpdate({ searchText: e.target.value })}
             placeholder="Search by description..."
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            className="w-full px-4 py-2.5 border border-line rounded-lg bg-surface text-ink placeholder:text-slate/70 focus:outline-none focus:border-pine transition-colors"
           />
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition font-medium flex items-center gap-2"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-line bg-surface text-ink text-sm font-medium hover:border-pine hover:text-pine-strong transition-colors"
         >
-          🔍 Filters
+          <span aria-hidden="true">⚲</span> Filters
           {hasActiveFilters && (
-            <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+            <span className="px-2 py-0.5 bg-pine text-paper text-xs font-mono tabular rounded-full">
               {activeFilterCount}
             </span>
           )}
@@ -122,37 +125,37 @@ export default function ExpenseFilters({ filters, onFilterChange }: ExpenseFilte
         {hasActiveFilters && (
           <button
             onClick={handleClearFilters}
-            className="px-4 py-2 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/30 transition font-medium"
+            className="px-4 py-2.5 rounded-lg border border-line text-slate text-sm font-medium hover:border-pine hover:text-ink transition-colors"
           >
-            Clear All
+            Clear all
           </button>
         )}
       </div>
 
       {isExpanded && (
-        <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="space-y-4 pt-4 border-t border-line">
           {/* Date Range */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                From Date
+              <label className={ledgerLabel}>
+                From date
               </label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => handleFilterUpdate({ dateFrom: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className={ledgerInput}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                To Date
+              <label className={ledgerLabel}>
+                To date
               </label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => handleFilterUpdate({ dateTo: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className={ledgerInput}
               />
             </div>
           </div>
@@ -160,45 +163,45 @@ export default function ExpenseFilters({ filters, onFilterChange }: ExpenseFilte
           {/* Amount Range */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Min Amount (₹)
+              <label className={ledgerLabel}>
+                Min amount (₹)
               </label>
               <input
                 type="number"
                 value={minAmount}
                 onChange={(e) => handleFilterUpdate({ minAmount: e.target.value })}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className={`${ledgerInput} font-mono tabular`}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Max Amount (₹)
+              <label className={ledgerLabel}>
+                Max amount (₹)
               </label>
               <input
                 type="number"
                 value={maxAmount}
                 onChange={(e) => handleFilterUpdate({ maxAmount: e.target.value })}
                 placeholder="No limit"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                className={`${ledgerInput} font-mono tabular`}
               />
             </div>
           </div>
 
           {/* Payment Methods */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Payment Methods
+            <label className={ledgerLabel}>
+              Payment methods
             </label>
             <div className="flex flex-wrap gap-2">
               {paymentMethods.map(method => (
                 <button
                   key={method}
                   onClick={() => handlePaymentMethodToggle(method)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     selectedPaymentMethods.includes(method)
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      ? 'bg-pine text-paper'
+                      : 'border border-line text-slate hover:border-pine hover:text-ink'
                   }`}
                 >
                   {method.charAt(0).toUpperCase() + method.slice(1)}
@@ -209,19 +212,19 @@ export default function ExpenseFilters({ filters, onFilterChange }: ExpenseFilte
 
           {/* Categories */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className={ledgerLabel}>
               Categories ({selectedCategories.length} selected)
             </label>
-            <div className="max-h-48 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500">
+            <div className="max-h-48 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-paper [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {categories.map(category => (
                   <button
                     key={category}
                     onClick={() => handleCategoryToggle(category)}
-                    className={`px-3 py-2 rounded-lg text-sm text-left transition ${
+                    className={`px-3 py-2 rounded-lg text-sm text-left transition-colors ${
                       selectedCategories.includes(category)
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-pine text-paper'
+                        : 'bg-paper text-ink hover:bg-line/60'
                     }`}
                   >
                     {CATEGORY_LABELS[category] || category}

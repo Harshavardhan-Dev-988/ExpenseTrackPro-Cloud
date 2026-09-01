@@ -1,39 +1,170 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
+
+/* ==========================================================================
+   The Ledger — design tokens
+   A personal-finance product, not a SaaS dashboard: calm paper ground,
+   ink for reading, pine for action, brass for money, ember reserved for
+   the one thing that actually needs your attention.
+   ========================================================================== */
+
+:root {
+  --paper: 238 241 238;        /* #EEF1EE background */
+  --surface: 255 255 255;      /* #FFFFFF cards, raised surfaces */
+  --ink: 23 33 29;             /* #17211D primary text */
+  --slate: 92 107 100;         /* #5C6B64 secondary text */
+  --line: 217 221 214;         /* #D9DDD6 hairlines, dividers */
+  --pine: 47 77 63;            /* #2F4D3F primary accent */
+  --pine-strong: 36 60 49;     /* #243C31 pine hover/active */
+  --brass: 169 118 46;         /* #A9762E money, savings, goals */
+  --brass-strong: 138 92 20;   /* #8A5C14 brass hover/active */
+  --ember: 179 73 47;          /* #B3492F over-budget / anomaly only */
+  --ember-strong: 151 56 31;   /* #97381F ember hover/active */
+}
+
+.dark {
+  --paper: 18 26 22;           /* #121A16 */
+  --surface: 27 38 32;         /* #1B2620 */
+  --ink: 236 241 236;          /* #ECF1EC */
+  --slate: 158 171 158;        /* #9EAB9E */
+  --line: 44 58 50;            /* #2C3A32 */
+  --pine: 122 168 145;         /* #7AA891 lifted for dark contrast */
+  --pine-strong: 150 196 172;  /* #96C4AC */
+  --brass: 214 165 92;         /* #D6A55C lifted */
+  --brass-strong: 232 189 122; /* #E8BD7A */
+  --ember: 224 132 104;        /* #E08468 lifted, still restrained */
+  --ember-strong: 239 161 137; /* #EFA189 */
+}
 
 @layer base {
-  body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
-  }
-  
   * {
     @apply box-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-paper text-ink font-body antialiased;
+    transition: background-color 0.3s ease;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces', ui-serif, Georgia, serif;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+
+  /* Every amount, date column and chart axis reads in mono tabular figures —
+     the thing that makes a page of numbers feel like a statement you can trust. */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible keyboard focus everywhere, styled to the system rather than
+     the browser default outline. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--pine));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: rgb(var(--brass) / 0.28);
   }
 }
 
 @layer utilities {
-  /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .scrollbar-hide::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+    display: none;
   }
 
-  /* Fade in animation */
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-in;
+  /* The faint ruled-paper backdrop used behind the signature ledger-line
+     chart — a ledger page, not a chart-library grid. Kept to ~4% opacity
+     so it reads as texture, not decoration. */
+  .ledger-rules {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgb(var(--ink) / 0.05) 0,
+      rgb(var(--ink) / 0.05) 1px,
+      transparent 1px,
+      transparent 32px
+    );
   }
-  
+  .dark .ledger-rules {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgb(var(--ink) / 0.06) 0,
+      rgb(var(--ink) / 0.06) 1px,
+      transparent 1px,
+      transparent 32px
+    );
+  }
+
+  .card-surface {
+    @apply bg-surface border border-line rounded-ledger shadow-ledger;
+  }
+
+  /* Quiet native number-input spinners so the amount field in ExpenseForm
+     reads as a ledger figure, not a stray form control. */
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s ease-in both;
+  }
   @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* A quiet ambient glow behind the dashboard's headline number — the one
+     place in the app that earns a bit of depth, since it's the number
+     everything else is in service of. Blurred, low-opacity, slow drift;
+     never a hard-edged blob. Purely decorative: pointer-events none. */
+  .aura {
+    position: absolute;
+    inset: -20% -10% auto auto;
+    width: 60%;
+    max-width: 420px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    filter: blur(56px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.5;
+    animation: auraDrift 14s ease-in-out infinite;
+  }
+  .aura-pine { background: radial-gradient(circle, rgb(var(--pine) / 0.22), transparent 70%); }
+  .aura-brass { background: radial-gradient(circle, rgb(var(--brass) / 0.20), transparent 70%); }
+  @keyframes auraDrift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-4%, 3%) scale(1.08); }
   }
 }
 
+/* Respect the person's OS-level motion preference everywhere, including
+   inside libraries (framer-motion, recharts) that don't check it themselves. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

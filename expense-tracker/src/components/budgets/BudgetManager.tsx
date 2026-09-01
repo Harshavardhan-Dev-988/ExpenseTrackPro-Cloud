@@ -93,24 +93,26 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
 
   const getProgressColor = (spent: number, limit: number, threshold: number) => {
     const percentage = (spent / limit) * 100;
-    if (percentage >= 100) return 'bg-red-500';
-    if (percentage >= threshold) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (percentage >= 100) return 'bg-ember';
+    if (percentage >= threshold) return 'bg-brass';
+    return 'bg-pine';
   };
 
   const categories = Object.keys(CATEGORY_LABELS) as CategoryType[];
+  const ledgerInput = 'w-full px-3 py-2 border border-line rounded-lg bg-surface text-ink focus:outline-none focus:border-pine transition-colors';
+  const ledgerLabel = 'block text-sm font-medium text-slate mb-2';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-gray-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-500">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm">
+      <div className="card-surface max-w-4xl w-full max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-paper [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              💰 Budget Management
+            <h2 className="font-display text-2xl font-semibold text-ink">
+              Budget Management
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="w-8 h-8 flex items-center justify-center text-slate hover:text-ink hover:bg-paper rounded-md transition-colors"
             >
               ✕
             </button>
@@ -118,15 +120,15 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
 
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">Loading budgets...</p>
+              <div className="mx-auto h-8 w-8 rounded-full border-2 border-line border-t-pine animate-spin" />
+              <p className="mt-4 text-sm text-slate font-mono">loading budgets…</p>
             </div>
           ) : (
             <>
               {/* Active Budgets */}
               {budgets.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  <h3 className="font-display text-lg font-semibold text-ink mb-4">
                     Active Budgets
                   </h3>
                   <div className="space-y-4">
@@ -136,21 +138,21 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                       const budgetTypeValue = budget.budgetType || 'monthly';
                       const limit = budgetTypeValue === 'monthly' ? (budget.monthlyLimit || 0) : (budget.yearlyLimit || 0);
                       const percentage = limit > 0 ? (spent / limit) * 100 : 0;
-                      
+
                       return (
                         <div
                           key={budget.category}
-                          className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                          className="border border-line rounded-lg p-4"
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
-                              <h4 className="font-medium text-gray-900 dark:text-white">
+                              <h4 className="font-medium text-ink">
                                 {CATEGORY_LABELS[budget.category] || budget.category}
                               </h4>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              <p className="text-xs text-slate mt-0.5">
                                 {budgetTypeValue === 'monthly' ? '📅 Monthly' : '📆 Yearly'}
                               </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              <p className="text-sm text-slate mt-1 font-mono tabular">
                                 {formatCurrency(spent)} / {formatCurrency(limit)}
                                 <span className="ml-2">
                                   ({percentage.toFixed(1)}%)
@@ -160,36 +162,36 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleEditBudget(budget)}
-                                className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/30"
+                                className="px-3 py-1 text-sm bg-pine/10 text-pine-strong dark:text-pine rounded hover:bg-pine/20 transition-colors"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteBudget(budget.category)}
-                                className="px-3 py-1 text-sm bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/30"
+                                className="px-3 py-1 text-sm bg-ember/10 text-ember-strong dark:text-ember rounded hover:bg-ember/20 transition-colors"
                               >
                                 Delete
                               </button>
                             </div>
                           </div>
-                          
+
                           {/* Progress Bar */}
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                          <div className="w-full bg-line/60 rounded-full h-3 overflow-hidden">
                             <div
                               className={`h-full transition-all duration-300 ${getProgressColor(spent, limit, budget.alertThreshold)}`}
                               style={{ width: `${Math.min(percentage, 100)}%` }}
                             />
                           </div>
-                          
+
                           {/* Warning Message */}
                           {percentage >= 100 && (
-                            <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                              ⚠️ Budget exceeded by {formatCurrency(spent - limit)}
+                            <p className="text-sm text-ember-strong dark:text-ember mt-2">
+                              Budget exceeded by {formatCurrency(spent - limit)}
                             </p>
                           )}
                           {percentage >= budget.alertThreshold && percentage < 100 && (
-                            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                              ⚠️ Approaching budget limit ({budget.alertThreshold}% threshold)
+                            <p className="text-sm text-brass-strong dark:text-brass mt-2">
+                              Approaching budget limit ({budget.alertThreshold}% threshold)
                             </p>
                           )}
                         </div>
@@ -200,20 +202,20 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
               )}
 
               {/* Add/Edit Budget Form */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="border-t border-line pt-6">
+                <h3 className="font-display text-lg font-semibold text-ink mb-4">
                   {editingCategory ? 'Edit Budget' : 'Add New Budget'}
                 </h3>
-                
+
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className={ledgerLabel}>
                       Category
                     </label>
                     <select
                       value={editingCategory || ''}
                       onChange={(e) => setEditingCategory(e.target.value as CategoryType)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className={ledgerInput}
                       disabled={saving}
                     >
                       <option value="">Select a category</option>
@@ -226,13 +228,13 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className={ledgerLabel}>
                       Budget Type
                     </label>
                     <select
                       value={budgetType}
                       onChange={(e) => setBudgetType(e.target.value as 'monthly' | 'yearly')}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className={ledgerInput}
                       disabled={saving}
                     >
                       <option value="monthly">Monthly</option>
@@ -241,7 +243,7 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className={ledgerLabel}>
                       {budgetType === 'monthly' ? 'Monthly' : 'Yearly'} Limit (₹)
                     </label>
                     <input
@@ -249,13 +251,13 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                       value={budgetLimit}
                       onChange={(e) => setBudgetLimit(e.target.value)}
                       placeholder="Enter budget amount"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className={`${ledgerInput} font-mono tabular`}
                       disabled={saving}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className={ledgerLabel}>
                       Alert Threshold (%)
                     </label>
                     <input
@@ -265,10 +267,10 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                       placeholder="80"
                       min="0"
                       max="100"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      className={`${ledgerInput} font-mono tabular`}
                       disabled={saving}
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-slate mt-1">
                       Get notified when spending reaches this percentage of the budget
                     </p>
                   </div>
@@ -277,7 +279,7 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                     <button
                       onClick={handleSaveBudget}
                       disabled={!editingCategory || !budgetLimit || saving}
-                      className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition"
+                      className="flex-1 px-4 py-2.5 bg-pine text-paper rounded-lg hover:bg-pine-strong disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm transition-colors"
                     >
                       {saving ? 'Saving...' : editingCategory ? 'Update Budget' : 'Add Budget'}
                     </button>
@@ -289,7 +291,7 @@ export default function BudgetManager({ currentSpending, onClose }: BudgetManage
                           setBudgetLimit('');
                           setAlertThreshold('80');
                         }}
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition"
+                        className="px-4 py-2.5 border border-line text-ink rounded-lg hover:border-pine transition-colors font-medium text-sm"
                       >
                         Cancel
                       </button>

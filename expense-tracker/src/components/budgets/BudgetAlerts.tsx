@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, memo } from 'react';
 import type { CategoryBudget, Expense } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/constants';
+import { formatMoney } from '../../utils/helpers';
 
 interface BudgetAlertsProps {
   budgets: CategoryBudget[];
@@ -102,14 +103,7 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
     }
   }, [showOnlyAlerts, alerts.length, dateRangeType, dateRangeLabel]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const formatCurrency = (value: number) => formatMoney(value, 'INR');
 
   // Auto-hide success message after 5 seconds (only if not persistent)
   useEffect(() => {
@@ -131,28 +125,20 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
   // Show positive message if no alerts but budgets exist (with auto-hide unless persistent)
   if (budgets.length > 0 && alerts.length === 0 && showSuccessMessage) {
     return (
-      <div className="mb-6 animate-fade-in">
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-xl p-5 shadow-md">
+      <div className="mb-6 fade-in">
+        <div className="card-surface p-5 border-l-4 border-l-pine">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1">
-              <span className="text-3xl">✅</span>
+              <span className="text-pine-strong dark:text-pine text-xl" aria-hidden="true">✓</span>
               <div className="flex-1">
-                <h3 className="font-bold text-green-900 dark:text-green-100 text-lg">
-                  All Budgets On Track
-                </h3>
-                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                  Great job! You're staying within your budget limits for {dateRangeLabel}.
-                </p>
+                <h3 className="font-display font-semibold text-ink text-base">All budgets on track</h3>
+                <p className="text-sm text-slate mt-1">You're within every limit you've set for {dateRangeLabel}.</p>
                 {persistSuccessMessage && budgets.length > 0 && (
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {budgets.map(budget => (
-                      <div key={budget.category} className="text-xs bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 border border-green-200 dark:border-green-800">
-                        <div className="font-semibold text-green-900 dark:text-green-100">
-                          {CATEGORY_LABELS[budget.category] || budget.category}
-                        </div>
-                        <div className="text-green-700 dark:text-green-300 mt-0.5">
-                          ₹0 spent • 0% used
-                        </div>
+                      <div key={budget.category} className="text-xs bg-paper rounded-lg p-2 border border-line font-mono">
+                        <div className="font-semibold text-ink">{CATEGORY_LABELS[budget.category] || budget.category}</div>
+                        <div className="text-slate mt-0.5">₹0 spent · 0% used</div>
                       </div>
                     ))}
                   </div>
@@ -162,7 +148,7 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
             {!persistSuccessMessage && (
               <button
                 onClick={() => setShowSuccessMessage(false)}
-                className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 transition-colors p-1"
+                className="text-slate hover:text-ink transition-colors p-1"
                 aria-label="Close"
               >
                 ✕
@@ -182,50 +168,34 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
   return (
     <div className={`space-y-2 transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}>
       {/* Compact Summary Banner */}
-      <div className={`rounded-lg p-3 border-l-4 ${
-        exceededCount > 0
-          ? 'bg-red-50/50 dark:bg-red-900/10 border-red-500'
-          : 'bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-500'
-      }`}>
+      <div className={`card-surface p-3 border-l-4 ${exceededCount > 0 ? 'border-l-ember' : 'border-l-brass'}`}>
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-lg">{exceededCount > 0 ? '🚨' : '⚠️'}</span>
+          <div className="flex items-center gap-2.5 flex-1">
+            <span className={`text-lg ${exceededCount > 0 ? 'text-ember' : 'text-brass'}`} aria-hidden="true">{exceededCount > 0 ? '⚠' : '!'}</span>
             <div className="flex-1">
-              <p className={`text-sm font-semibold ${
-                exceededCount > 0
-                  ? 'text-red-900 dark:text-red-100'
-                  : 'text-yellow-900 dark:text-yellow-100'
-              }`}>
+              <p className="text-sm font-semibold text-ink">
                 {exceededCount > 0
-                  ? `${exceededCount} Budget${exceededCount !== 1 ? 's' : ''} Exceeded`
-                  : `${warningCount} Budget Warning${warningCount !== 1 ? 's' : ''}`}
-                {' • '}{dateRangeLabel}
+                  ? `${exceededCount} budget${exceededCount !== 1 ? 's' : ''} over limit`
+                  : `${warningCount} budget${warningCount !== 1 ? 's' : ''} running close`}
+                <span className="text-slate font-normal"> · {dateRangeLabel}</span>
               </p>
-              <p className={`text-xs ${
-                exceededCount > 0
-                  ? 'text-red-700 dark:text-red-300'
-                  : 'text-yellow-700 dark:text-yellow-300'
-              }`}>
-                {exceededCount > 0
-                  ? 'Budget limits exceeded. Consider adjusting spending.'
-                  : 'Approaching budget limits. Monitor spending.'}
+              <p className="text-xs text-slate">
+                {exceededCount > 0 ? "You've gone past the limit — worth a look." : 'Approaching the limit you set.'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onManageBudgets}
-              className={`px-3 py-1.5 text-xs rounded-md font-medium transition ${
-                exceededCount > 0
-                  ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/40'
-                  : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/40'
+              className={`px-3 py-1.5 text-xs rounded-md font-medium transition-colors ${
+                exceededCount > 0 ? 'bg-ember/10 text-ember-strong dark:text-ember hover:bg-ember/20' : 'bg-brass/10 text-brass-strong dark:text-brass hover:bg-brass/20'
               }`}
             >
               Manage →
             </button>
             <button
               onClick={() => setDismissedAlerts(true)}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              className="p-1 text-slate hover:text-ink transition-colors"
               title="Dismiss"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,59 +209,30 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
       {/* Compact Detailed Alerts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {alerts.map(({ budget, spent, limit, percentage, status }) => (
-          <div
-            key={budget.category}
-            className={`rounded-md p-3 border ${
-              status === 'exceeded'
-                ? 'bg-red-50/30 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                : 'bg-yellow-50/30 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
-            }`}
-          >
+          <div key={budget.category} className="card-surface p-3">
             <div className="flex justify-between items-start mb-1.5">
-              <h4
-                className={`text-sm font-semibold ${
-                  status === 'exceeded'
-                    ? 'text-red-900 dark:text-red-100'
-                    : 'text-yellow-900 dark:text-yellow-100'
-                }`}
-              >
-                {CATEGORY_LABELS[budget.category] || budget.category || 'Unknown'}
-              </h4>
-              <span
-                className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  status === 'exceeded'
-                    ? 'bg-red-200 dark:bg-red-900/30 text-red-800 dark:text-red-200'
-                    : 'bg-yellow-200 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
-                }`}
-              >
+              <h4 className="text-sm font-medium text-ink">{CATEGORY_LABELS[budget.category] || budget.category || 'Unknown'}</h4>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium font-mono ${
+                status === 'exceeded' ? 'bg-ember/10 text-ember-strong dark:text-ember' : 'bg-brass/10 text-brass-strong dark:text-brass'
+              }`}>
                 {percentage.toFixed(0)}%
               </span>
             </div>
 
             <div className="space-y-1">
-              <p
-                className={`text-xs font-medium ${
-                  status === 'exceeded'
-                    ? 'text-red-700 dark:text-red-300'
-                    : 'text-yellow-700 dark:text-yellow-300'
-                }`}
-              >
+              <p className="text-xs font-mono tabular text-slate">
                 {formatCurrency(spent)} / {formatCurrency(limit)}
               </p>
-              
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+
+              <div className="w-full bg-line/60 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className={`h-full transition-all ${
-                    status === 'exceeded' ? 'bg-red-500' : 'bg-yellow-500'
-                  }`}
+                  className={`h-full transition-all ${status === 'exceeded' ? 'bg-ember' : 'bg-brass'}`}
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
-              
+
               {status === 'exceeded' && (
-                <p className="text-xs text-red-600 dark:text-red-400">
-                  Over by {formatCurrency(spent - limit)}
-                </p>
+                <p className="text-xs text-ember-strong dark:text-ember">Over by {formatCurrency(spent - limit)}</p>
               )}
             </div>
           </div>

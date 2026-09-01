@@ -208,16 +208,16 @@ export default function MonthlyTrendChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
-          <p className="font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-            Total: <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(payload[0].value)}</span>
+        <div className="card-surface px-3.5 py-3 text-sm">
+          <p className="font-medium text-ink mb-1.5">{label}</p>
+          <p className="text-xs text-slate">
+            Total <span className="ml-1 font-mono tabular font-medium text-pine-strong dark:text-pine">{formatCurrency(payload[0].value)}</span>
           </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-            Avg/Transaction: <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(payload[1]?.value || 0)}</span>
+          <p className="text-xs text-slate">
+            Avg / transaction <span className="ml-1 font-mono tabular font-medium text-brass-strong dark:text-brass">{formatCurrency(payload[1]?.value || 0)}</span>
           </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Transactions: <span className="font-medium text-gray-900 dark:text-white">{payload[0].payload.count}</span>
+          <p className="text-xs text-slate">
+            Transactions <span className="ml-1 font-mono tabular font-medium text-ink">{payload[0].payload.count}</span>
           </p>
         </div>
       );
@@ -226,38 +226,42 @@ export default function MonthlyTrendChart({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+    <div className="card-surface p-5 sm:p-6">
+      <h2 className="font-display text-lg font-semibold text-ink mb-1">
         {title}
       </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <p className="text-xs text-slate font-mono mb-4">
         {subtitle}
       </p>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
+          <CartesianGrid strokeDasharray="3 6" stroke="rgb(var(--line))" vertical={false} />
           <XAxis
             dataKey={xAxisKey}
-            stroke="#6B7280"
-            style={{ fontSize: '11px' }}
+            stroke="rgb(var(--slate))"
+            style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace' }}
             angle={chartData.length > 15 ? -45 : 0}
             textAnchor={chartData.length > 15 ? "end" : "middle"}
             height={chartData.length > 15 ? 80 : 60}
+            tickLine={false}
+            axisLine={{ stroke: 'rgb(var(--line))' }}
           />
           <YAxis
-            stroke="#6B7280"
-            style={{ fontSize: '12px' }}
+            stroke="rgb(var(--slate))"
+            style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace' }}
             tickFormatter={formatCurrency}
+            tickLine={false}
+            axisLine={false}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgb(var(--line))', strokeWidth: 1 }} />
+          <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '12px', fontFamily: 'JetBrains Mono, monospace', color: 'rgb(var(--slate))' }} />
           <Line
             type="monotone"
             dataKey="total"
-            stroke="#3B82F6"
+            stroke="rgb(var(--pine))"
             strokeWidth={3}
-            dot={{ fill: '#3B82F6', r: 4, strokeWidth: 2, stroke: '#fff' }}
-            activeDot={{ r: 7, strokeWidth: 2, stroke: '#3B82F6' }}
+            dot={{ fill: 'rgb(var(--pine))', r: 4, strokeWidth: 2, stroke: 'rgb(var(--surface))' }}
+            activeDot={{ r: 7, strokeWidth: 2, stroke: 'rgb(var(--pine))' }}
             name="Total Spending"
             animationDuration={1000}
             animationEasing="ease-in-out"
@@ -265,10 +269,10 @@ export default function MonthlyTrendChart({
           <Line
             type="monotone"
             dataKey="average"
-            stroke="#10B981"
+            stroke="rgb(var(--brass))"
             strokeWidth={2}
-            dot={{ fill: '#10B981', r: 3, strokeWidth: 2, stroke: '#fff' }}
-            activeDot={{ r: 6, strokeWidth: 2, stroke: '#10B981' }}
+            dot={{ fill: 'rgb(var(--brass))', r: 3, strokeWidth: 2, stroke: 'rgb(var(--surface))' }}
+            activeDot={{ r: 6, strokeWidth: 2, stroke: 'rgb(var(--brass))' }}
             name="Average per Transaction"
             strokeDasharray="5 5"
             animationDuration={1000}

@@ -87,9 +87,11 @@ export default function ExportMenu({ expenses, budgets = [], totalExpenses, aver
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium shadow-md hover:shadow-lg flex items-center gap-2"
+        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-line bg-surface text-ink text-sm font-medium hover:border-pine hover:text-pine-strong active:scale-[0.98] transition-all duration-200 whitespace-nowrap"
       >
-        <span>📥</span>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
         <span>Export</span>
       </button>
 
@@ -102,30 +104,30 @@ export default function ExportMenu({ expenses, budgets = [], totalExpenses, aver
           />
 
           {/* Dropdown Menu */}
-          <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20">
+          <div className="absolute right-0 mt-2 w-56 card-surface z-20">
             <div className="p-2">
               <button
                 onClick={() => handleExport('csv')}
                 disabled={isExporting}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-paper rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                📄 Export as CSV
+                Export as CSV
               </button>
               <button
                 onClick={() => handleExport('excel')}
                 disabled={isExporting}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-paper rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                📊 Export as Excel
+                Export as Excel
               </button>
               <button
                 onClick={() => handleExport('json')}
                 disabled={isExporting}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-paper rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                📋 Export as JSON
+                Export as JSON
               </button>
-              <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+              <div className="border-t border-line my-2" />
               {onPDFExport && (
                 <button
                   onClick={() => {
@@ -133,18 +135,18 @@ export default function ExportMenu({ expenses, budgets = [], totalExpenses, aver
                     setIsOpen(false);
                   }}
                   disabled={isExporting}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+                  className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-paper rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
                 >
-                  📄 Generate PDF Report
+                  Generate PDF Report
                 </button>
               )}
-              {onPDFExport && <div className="border-t border-gray-200 dark:border-gray-700 my-2" />}
+              {onPDFExport && <div className="border-t border-line my-2" />}
               <button
                 onClick={handleExportSummary}
                 disabled={isExporting}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full text-left px-4 py-2 text-sm text-ink hover:bg-paper rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                📈 Export Summary
+                Export Summary
               </button>
             </div>
           </div>

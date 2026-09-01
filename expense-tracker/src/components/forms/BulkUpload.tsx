@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import type { CategoryType, PaymentMethod } from '../../types';import { CATEGORY_LABELS } from '../../utils/constants';
+import type { CategoryType, PaymentMethod } from '../../types';
+import { CATEGORY_LABELS } from '../../utils/constants';
 interface BulkUploadProps {
   onUpload: (expenses: Array<{
     date: Date;
@@ -20,6 +22,7 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -168,14 +171,42 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Bulk Upload Expenses</h2>
-          
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div
+        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onCancel}
+      />
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Bulk upload expenses"
+        initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="relative card-surface max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+      >
+        <div className="p-6 sm:p-7">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="font-display text-xl font-semibold text-ink">Bulk upload expenses</h2>
+              <p className="text-xs text-slate mt-0.5">Bring in a batch of entries from a CSV, Excel, or JSON file.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Close"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-slate hover:text-ink hover:bg-paper transition-colors shrink-0"
+            >
+              ✕
+            </button>
+          </div>
+
           {/* File Upload */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-ink mb-2">
               Select File (CSV, Excel, or JSON)
             </label>
             <input
@@ -183,16 +214,16 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
               type="file"
               accept=".csv,.xlsx,.xls,.json"
               onChange={handleFileSelect}
-              className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700 focus:outline-none"
+              className="block w-full text-sm text-ink border border-line rounded-lg cursor-pointer bg-paper focus:outline-none focus:border-pine"
             />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-2 text-xs text-slate">
               Expected columns: date, amount, category, description, paymentMethod (optional), tags (optional)
             </p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
+            <div className="mb-4 p-3 bg-ember/10 text-ember-strong dark:text-ember rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -200,26 +231,26 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
           {/* Preview */}
           {preview.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              <h3 className="font-display text-base font-semibold text-ink mb-3">
                 Preview (first 10 rows)
               </h3>
-              <div className="overflow-x-auto border border-gray-300 dark:border-gray-600 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+              <div className="overflow-x-auto border border-line rounded-lg">
+                <table className="min-w-full divide-y divide-line">
+                  <thead className="bg-paper">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Category</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Description</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate uppercase tracking-wide">Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate uppercase tracking-wide">Amount</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate uppercase tracking-wide">Category</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-slate uppercase tracking-wide">Description</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-surface divide-y divide-line">
                     {preview.map((row, idx) => (
-                      <tr key={idx}>
-                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{row.date || row.Date}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{row.amount || row.Amount}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{row.category || row.Category}</td>
-                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{row.description || row.Description}</td>
+                      <tr key={idx} className="hover:bg-paper transition-colors">
+                        <td className="px-4 py-2 text-sm text-ink font-mono tabular">{row.date || row.Date}</td>
+                        <td className="px-4 py-2 text-sm text-ink font-mono tabular">{row.amount || row.Amount}</td>
+                        <td className="px-4 py-2 text-sm text-ink">{row.category || row.Category}</td>
+                        <td className="px-4 py-2 text-sm text-ink">{row.description || row.Description}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -233,20 +264,20 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
             <button
               onClick={handleUpload}
               disabled={isProcessing || preview.length === 0}
-              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               {isProcessing ? 'Processing...' : 'Upload Expenses'}
             </button>
             <button
               onClick={onCancel}
               disabled={isProcessing}
-              className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg border border-line bg-surface text-ink text-sm font-medium hover:border-pine hover:text-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

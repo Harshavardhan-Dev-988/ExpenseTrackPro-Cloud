@@ -156,19 +156,19 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
   };
 
   const getTrendColor = (trend: 'up' | 'down' | 'stable') => {
-    if (trend === 'up') return 'text-red-600 dark:text-red-400';
-    if (trend === 'down') return 'text-green-600 dark:text-green-400';
-    return 'text-gray-600 dark:text-gray-400';
+    if (trend === 'up') return 'text-ember-strong dark:text-ember';
+    if (trend === 'down') return 'text-pine-strong dark:text-pine';
+    return 'text-slate';
   };
 
   if (expenses.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+      <div className="bg-surface border border-line rounded-ledger shadow-ledger p-12 text-center">
         <div className="text-6xl mb-4">📊</div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-2xl font-bold text-ink mb-2">
           No Data for Analytics
         </h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-slate">
           Add expenses to see detailed analytics and insights.
         </p>
       </div>
@@ -178,74 +178,75 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          📊 Advanced Analytics
-        </h2>
-        
+      <div className="card-surface p-6">
+        <div className="mb-4">
+          <h2 className="font-display text-xl font-semibold text-ink">Reports</h2>
+          <p className="text-xs text-slate mt-0.5">The same numbers, read six different ways.</p>
+        </div>
+
         {/* View Selector */}
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
           <button
             onClick={() => setSelectedView('insights')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'insights'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            💡 Insights
+            Insights
           </button>
           <button
             onClick={() => setSelectedView('patterns')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'patterns'
-                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            🔄 Patterns
+            Patterns
           </button>
           <button
             onClick={() => setSelectedView('yoy')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'yoy'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            📆 YoY
+            Year over year
           </button>
           <button
             onClick={() => setSelectedView('mom')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'mom'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            📅 MoM
+            Month over month
           </button>
           <button
             onClick={() => setSelectedView('stats')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'stats'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            📈 Statistics
+            Statistics
           </button>
           <button
             onClick={() => setSelectedView('anomalies')}
-            className={`min-w-[120px] px-4 py-2.5 rounded-lg font-medium transition whitespace-nowrap flex items-center justify-center ${
+            className={`px-3.5 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
               selectedView === 'anomalies'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'bg-pine text-paper'
+                : 'text-slate hover:bg-paper hover:text-ink'
             }`}
           >
-            <span>🚨 Anomalies</span>
+            <span>Anomalies</span>
             {anomaliesData.anomalies.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+              <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full font-mono ${selectedView === 'anomalies' ? 'bg-paper/25 text-paper' : 'bg-ember/10 text-ember-strong dark:text-ember'}`}>
                 {anomaliesData.anomalies.length}
               </span>
             )}
@@ -255,10 +256,10 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Key Insights View */}
       {selectedView === 'insights' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Hero Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-pine to-pine-strong rounded-ledger shadow-ledger p-6 text-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-4xl">💰</div>
                 <div className="text-right">
@@ -271,7 +272,7 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-pine to-pine-strong rounded-ledger shadow-ledger p-6 text-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-4xl">📊</div>
                 <div className="text-right">
@@ -284,7 +285,7 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-brass to-brass-strong rounded-ledger shadow-ledger p-6 text-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-4xl">⚡</div>
                 <div className="text-right">
@@ -297,7 +298,7 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
+            <div className="bg-gradient-to-br from-brass to-brass-strong rounded-ledger shadow-ledger p-6 text-white">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-4xl">🎯</div>
                 <div className="text-right">
@@ -313,28 +314,28 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
           {/* Quick Insights */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+              <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
                 <span className="text-2xl">🏆</span> Top Spending Category
               </h3>
               {keyInsights.topCategory && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                    <span className="text-ink/80 font-medium">
                       {CATEGORY_LABELS[keyInsights.topCategory.category] || keyInsights.topCategory.category}
                     </span>
-                    <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                    <span className="text-xl font-bold text-pine-strong dark:text-pine">
                       {formatCurrency(keyInsights.topCategory.amount)}
                     </span>
                   </div>
                   <div className="relative pt-1">
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-3 bg-line/60 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-pine to-brass-strong rounded-full"
                         style={{ width: `${(keyInsights.topCategory.amount / keyInsights.total) * 100}%` }}
                       ></div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    <p className="text-sm text-slate mt-2">
                       {((keyInsights.topCategory.amount / keyInsights.total) * 100).toFixed(1)}% of total spending
                     </p>
                   </div>
@@ -342,29 +343,29 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
               )}
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+              <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
                 <span className="text-2xl">💎</span> Largest Single Expense
               </h3>
               {keyInsights.largestExpense && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
+                      <p className="font-medium text-ink">
                         {keyInsights.largestExpense.description}
                       </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-slate">
                         {CATEGORY_LABELS[keyInsights.largestExpense.category] || keyInsights.largestExpense.category}
                       </p>
                     </div>
-                    <span className="text-xl font-bold text-red-600 dark:text-red-400">
+                    <span className="text-xl font-bold text-ember-strong dark:text-ember">
                       {formatCurrency(keyInsights.largestExpense.amount)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-slate">
                     📅 {format(new Date(keyInsights.largestExpense.date), 'MMM dd, yyyy')}
                   </p>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <p className="text-sm font-medium text-ink/80">
                     {((keyInsights.largestExpense.amount / keyInsights.avgTransaction)).toFixed(1)}x the average transaction
                   </p>
                 </div>
@@ -373,26 +374,26 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Recent Spending Insight */}
-          <div className="bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-gradient-to-r from-pine/10 to-pine/10 dark:from-pine/10 dark:to-pine/10 rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
               <span className="text-2xl">📅</span> Last 30 Days Overview
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Daily Average</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                <p className="text-sm text-slate mb-1">Daily Average</p>
+                <p className="text-3xl font-bold text-ink">
                   {formatCurrency(keyInsights.recentAvg)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Projected Monthly</p>
-                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                <p className="text-sm text-slate mb-1">Projected Monthly</p>
+                <p className="text-3xl font-bold text-pine-strong dark:text-pine">
                   {formatCurrency(keyInsights.recentAvg * 30)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">vs Overall Avg</p>
-                <p className={`text-3xl font-bold ${keyInsights.recentAvg > keyInsights.velocity ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                <p className="text-sm text-slate mb-1">vs Overall Avg</p>
+                <p className={`text-3xl font-bold ${keyInsights.recentAvg > keyInsights.velocity ? 'text-ember-strong dark:text-ember' : 'text-pine-strong dark:text-pine'}`}>
                   {keyInsights.recentAvg > keyInsights.velocity ? '+' : ''}{(((keyInsights.recentAvg - keyInsights.velocity) / keyInsights.velocity) * 100).toFixed(1)}%
                 </p>
               </div>
@@ -400,15 +401,15 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Spending Concentration */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-bold text-ink mb-4 flex items-center gap-2">
               <span className="text-2xl">🎯</span> Spending Concentration Analysis
             </h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">Concentration Index</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="font-medium text-ink">Concentration Index</p>
+                  <p className="text-sm text-slate">
                     {keyInsights.concentration < 15 ? 'Highly Diversified' :
                      keyInsights.concentration < 25 ? 'Well Balanced' :
                      keyInsights.concentration < 40 ? 'Moderately Concentrated' :
@@ -416,24 +417,24 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-2xl font-bold text-ink">
                     {keyInsights.concentration.toFixed(1)}%
                   </p>
                 </div>
               </div>
               <div className="relative pt-1">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-4 bg-line/60 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full ${
-                      keyInsights.concentration < 25 ? 'bg-green-500' :
-                      keyInsights.concentration < 40 ? 'bg-yellow-500' :
-                      'bg-red-500'
+                      keyInsights.concentration < 25 ? 'bg-pine' :
+                      keyInsights.concentration < 40 ? 'bg-brass' :
+                      'bg-ember'
                     }`}
                     style={{ width: `${Math.min(keyInsights.concentration, 100)}%` }}
                   ></div>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-slate">
                 💡 {keyInsights.concentration < 25 
                   ? 'Great! Your spending is well-distributed across categories.'
                   : keyInsights.concentration < 40
@@ -447,10 +448,10 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Spending Patterns View */}
       {selectedView === 'patterns' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Day of Week Pattern */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-bold text-ink mb-6 flex items-center gap-2">
               <span className="text-2xl">📅</span> Spending by Day of Week
             </h3>
             <div className="space-y-3">
@@ -465,19 +466,19 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                   return (
                     <div key={day} className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className={`font-medium ${isMax ? 'text-red-600 dark:text-red-400' : isMin ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        <span className={`font-medium ${isMax ? 'text-ember-strong dark:text-ember' : isMin ? 'text-pine-strong dark:text-pine' : 'text-ink/80'}`}>
                           {getDayName(parseInt(day))} {isMax && '🔥'} {isMin && '💚'}
                         </span>
-                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        <span className="text-sm font-bold text-ink">
                           {formatCurrency(amount)}
                         </span>
                       </div>
-                      <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="relative h-3 bg-line/60 rounded-full overflow-hidden">
                         <div 
                           className={`h-full rounded-full transition-all duration-500 ${
-                            isMax ? 'bg-gradient-to-r from-red-500 to-pink-500' :
-                            isMin ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                            'bg-gradient-to-r from-blue-500 to-cyan-500'
+                            isMax ? 'bg-gradient-to-r from-ember to-brass-strong' :
+                            isMin ? 'bg-gradient-to-r from-pine to-pine-strong' :
+                            'bg-gradient-to-r from-pine to-pine-strong'
                           }`}
                           style={{ width: `${percentage}%` }}
                         ></div>
@@ -487,23 +488,23 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                 })}
             </div>
             {spendingPatterns.mostActiveDay && spendingPatterns.leastActiveDay && (
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-6 pt-6 border-t border-line">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
-                    <p className="text-sm text-red-600 dark:text-red-400 mb-1">Highest Spending Day</p>
-                    <p className="font-bold text-lg text-red-900 dark:text-red-100">
+                  <div className="bg-ember/10 rounded-lg p-4">
+                    <p className="text-sm text-ember-strong dark:text-ember mb-1">Highest Spending Day</p>
+                    <p className="font-bold text-lg text-ember-strong dark:text-ember">
                       {getDayName(spendingPatterns.mostActiveDay.day)}
                     </p>
-                    <p className="text-sm text-red-700 dark:text-red-300">
+                    <p className="text-sm text-ember-strong dark:text-ember">
                       {formatCurrency(spendingPatterns.mostActiveDay.amount)}
                     </p>
                   </div>
-                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                    <p className="text-sm text-green-600 dark:text-green-400 mb-1">Lowest Spending Day</p>
-                    <p className="font-bold text-lg text-green-900 dark:text-green-100">
+                  <div className="bg-pine/10 rounded-lg p-4">
+                    <p className="text-sm text-pine-strong dark:text-pine mb-1">Lowest Spending Day</p>
+                    <p className="font-bold text-lg text-pine-strong dark:text-pine">
                       {getDayName(spendingPatterns.leastActiveDay.day)}
                     </p>
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                    <p className="text-sm text-pine-strong dark:text-pine">
                       {formatCurrency(spendingPatterns.leastActiveDay.amount)}
                     </p>
                   </div>
@@ -513,8 +514,8 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Payment Method Distribution */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-bold text-ink mb-6 flex items-center gap-2">
               <span className="text-2xl">💳</span> Payment Method Preferences
             </h3>
             <div className="space-y-3">
@@ -538,26 +539,26 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-2xl">{icons[method] || '💰'}</span>
-                          <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">
+                          <span className="font-medium text-ink/80 capitalize">
                             {method === 'unknown' ? 'Not Specified' : method}
                             {index === 0 && ' ⭐'}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-gray-900 dark:text-white">
+                          <p className="text-sm font-bold text-ink">
                             {formatCurrency(amount)}
                           </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <p className="text-xs text-slate">
                             {percentage.toFixed(1)}%
                           </p>
                         </div>
                       </div>
-                      <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="relative h-3 bg-line/60 rounded-full overflow-hidden">
                         <div 
                           className={`h-full rounded-full transition-all duration-500 ${
-                            index === 0 ? 'bg-gradient-to-r from-purple-500 to-pink-500' :
-                            index === 1 ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
-                            'bg-gradient-to-r from-gray-400 to-gray-500'
+                            index === 0 ? 'bg-gradient-to-r from-brass to-brass-strong' :
+                            index === 1 ? 'bg-gradient-to-r from-pine to-pine-strong' :
+                            'bg-gradient-to-r from-slate to-slate'
                           }`}
                           style={{ width: `${percentage}%` }}
                         ></div>
@@ -569,8 +570,8 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Category Frequency */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-bold text-ink mb-6 flex items-center gap-2">
               <span className="text-2xl">🔢</span> Most Frequent Categories
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -581,18 +582,18 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                   <div 
                     key={category}
                     className={`rounded-lg p-4 ${
-                      index === 0 ? 'bg-gradient-to-br from-yellow-100 to-orange-100 dark:from-yellow-900/30 dark:to-orange-900/30 border-2 border-yellow-400' :
-                      'bg-gray-50 dark:bg-gray-700'
+                      index === 0 ? 'bg-gradient-to-br from-brass/20 to-brass/10 dark:from-brass/20 dark:to-brass/10 border-2 border-brass' :
+                      'bg-paper'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <span className="text-sm font-medium text-ink/80">
                         {CATEGORY_LABELS[category as CategoryType] || category}
                       </span>
                       {index === 0 && <span className="text-xl">👑</span>}
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{count}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">transactions</p>
+                    <p className="text-2xl font-bold text-ink">{count}</p>
+                    <p className="text-xs text-slate">transactions</p>
                   </div>
                 ))}
             </div>
@@ -602,17 +603,17 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Year-over-Year View */}
       {selectedView === 'yoy' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Year Selector */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-ink">
                 Year Comparison
               </h3>
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 border border-line rounded-lg bg-white dark:bg-line/60 text-ink focus:ring-2 focus:ring-pine"
               >
                 {availableYears.map(year => (
                   <option key={year} value={year}>{year}</option>
@@ -622,25 +623,25 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Overall Comparison */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-gradient-to-r from-pine/10 to-pine/5 dark:from-pine/10 dark:to-pine/5 rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-semibold text-ink mb-4">
               Overall Comparison
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{yoyData.currentYear}</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <p className="text-sm text-slate mb-1">{yoyData.currentYear}</p>
+                <p className="text-2xl font-bold text-ink">
                   {formatCurrency(yoyData.overall.currentYearTotal)}
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{yoyData.previousYear}</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <p className="text-sm text-slate mb-1">{yoyData.previousYear}</p>
+                <p className="text-2xl font-bold text-ink">
                   {formatCurrency(yoyData.overall.previousYearTotal)}
                 </p>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Change</p>
+              <div className="bg-surface border border-line rounded-lg p-4">
+                <p className="text-sm text-slate mb-1">Change</p>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{getTrendIcon(yoyData.overall.trend)}</span>
                   <div>
@@ -658,43 +659,43 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
           </div>
 
           {/* Category Breakdown */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-semibold text-ink mb-4">
               Category Breakdown
             </h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <table className="min-w-full divide-y divide-line">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <tr className="bg-paper">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Category
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       {yoyData.currentYear}
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       {yoyData.previousYear}
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Change
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Trend
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-surface border border-line divide-y divide-line">
                   {yoyData.categories
                     .sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
                     .map((cat) => (
-                      <tr key={cat.category} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      <tr key={cat.category} className="hover:bg-paper dark:hover:bg-line/60">
+                        <td className="px-4 py-3 text-sm font-medium text-ink">
                           {CATEGORY_LABELS[cat.category] || cat.category || 'Unknown'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-sm text-right text-ink/80">
                           {formatCurrency(cat.currentYearTotal)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-sm text-right text-ink/80">
                           {formatCurrency(cat.previousYearTotal)}
                         </td>
                         <td className={`px-4 py-3 text-sm text-right font-medium ${getTrendColor(cat.trend)}`}>
@@ -715,71 +716,71 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Month-over-Month View */}
       {selectedView === 'mom' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+            <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+              <p className="text-sm font-medium text-slate mb-2">
                 Average Monthly Spend
               </p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+              <p className="text-3xl font-bold text-ink">
                 {formatCurrency(momData.avgMonthlySpend)}
               </p>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-green-600 dark:text-green-400 mb-2">
+            <div className="bg-pine/10 rounded-ledger shadow-ledger p-6">
+              <p className="text-sm font-medium text-pine-strong dark:text-pine mb-2">
                 Lowest Month
               </p>
-              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+              <p className="text-2xl font-bold text-pine-strong dark:text-pine">
                 {format(new Date(momData.lowestMonth.month + '-01'), 'MMM yyyy')}
               </p>
-              <p className="text-lg text-green-700 dark:text-green-300">
+              <p className="text-lg text-pine-strong dark:text-pine">
                 {formatCurrency(momData.lowestMonth.total)}
               </p>
             </div>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow p-6">
-              <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+            <div className="bg-ember/10 rounded-ledger shadow-ledger p-6">
+              <p className="text-sm font-medium text-ember-strong dark:text-ember mb-2">
                 Highest Month
               </p>
-              <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+              <p className="text-2xl font-bold text-ember-strong dark:text-ember">
                 {format(new Date(momData.highestMonth.month + '-01'), 'MMM yyyy')}
               </p>
-              <p className="text-lg text-red-700 dark:text-red-300">
+              <p className="text-lg text-ember-strong dark:text-ember">
                 {formatCurrency(momData.highestMonth.total)}
               </p>
             </div>
           </div>
 
           {/* Monthly Trend Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6">
+            <h3 className="text-lg font-semibold text-ink mb-4">
               Monthly Trend
             </h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <table className="min-w-full divide-y divide-line">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <tr className="bg-paper">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Month
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Total
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Change from Prev
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                       Trend
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-surface border border-line divide-y divide-line">
                   {momData.months.map((month) => (
-                    <tr key={month.month} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                    <tr key={month.month} className="hover:bg-paper dark:hover:bg-line/60">
+                      <td className="px-4 py-3 text-sm font-medium text-ink">
                         {format(new Date(month.month + '-01'), 'MMMM yyyy')}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-3 text-sm text-right text-ink/80">
                         {formatCurrency(month.total)}
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${getTrendColor(month.trend)}`}>
@@ -805,59 +806,59 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Statistical Summary View */}
       {selectedView === 'stats' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="bg-surface border border-line rounded-ledger shadow-ledger p-6 animate-fade-up">
+          <h3 className="text-lg font-semibold text-ink mb-4">
             Statistical Summary by Category
           </h3>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="min-w-full divide-y divide-line">
               <thead>
-                <tr className="bg-gray-50 dark:bg-gray-700">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                <tr className="bg-paper">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Category
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Count
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Total
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Mean
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Median
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Min / Max
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate dark:text-slate uppercase tracking-wider">
                     Std Dev
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-surface border border-line divide-y divide-line">
                 {statsData.map((stat) => (
-                  <tr key={stat.category} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  <tr key={stat.category} className="hover:bg-paper dark:hover:bg-line/60">
+                    <td className="px-4 py-3 text-sm font-medium text-ink">
                       {CATEGORY_LABELS[stat.category] || stat.category || 'Unknown'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       {stat.count}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       {formatCurrency(stat.total)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       {formatCurrency(stat.mean)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       {formatCurrency(stat.median)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       {formatCurrency(stat.min)} / {formatCurrency(stat.max)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-700 dark:text-gray-300">
+                    <td className="px-4 py-3 text-sm text-right text-ink/80">
                       ±{formatCurrency(stat.stdDev)}
                     </td>
                   </tr>
@@ -870,24 +871,24 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
 
       {/* Anomaly Detection View */}
       {selectedView === 'anomalies' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-up">
           {anomaliesData.anomalies.length === 0 ? (
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg shadow p-12 text-center">
+            <div className="bg-pine/10 rounded-ledger shadow-ledger p-12 text-center">
               <div className="text-6xl mb-4">✅</div>
-              <h3 className="text-2xl font-bold text-green-900 dark:text-green-100 mb-2">
+              <h3 className="text-2xl font-bold text-pine-strong dark:text-pine mb-2">
                 No Anomalies Detected
               </h3>
-              <p className="text-green-700 dark:text-green-300">
+              <p className="text-pine-strong dark:text-pine">
                 All expenses are within normal ranges for their categories.
               </p>
             </div>
           ) : (
             <>
-              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+              <div className="bg-ember/10 rounded-ledger shadow-ledger p-6">
+                <h3 className="text-lg font-semibold text-ember-strong dark:text-ember mb-2">
                   🚨 {anomaliesData.anomalies.length} Unusual Expense{anomaliesData.anomalies.length !== 1 ? 's' : ''} Detected
                 </h3>
-                <p className="text-sm text-red-700 dark:text-red-300">
+                <p className="text-sm text-ember-strong dark:text-ember">
                   These expenses are more than {anomaliesData.threshold} standard deviations from their category average.
                 </p>
               </div>
@@ -895,29 +896,29 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
               <div className="space-y-4">
                 {anomaliesData.anomalies.map((anomaly, index) => {
                   const severityColors = {
-                    high: 'border-red-500 bg-red-50 dark:bg-red-900/20',
-                    medium: 'border-orange-500 bg-orange-50 dark:bg-orange-900/20',
-                    low: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
+                    high: 'border-ember bg-ember/10',
+                    medium: 'border-brass bg-brass/10',
+                    low: 'border-brass bg-brass/10',
                   };
 
                   return (
                     <div
                       key={index}
-                      className={`border-l-4 rounded-lg shadow p-6 ${severityColors[anomaly.severity]}`}
+                      className={`border-l-4 rounded-ledger shadow-ledger p-6 ${severityColors[anomaly.severity]}`}
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          <h4 className="text-lg font-semibold text-ink">
                             {anomaly.expense.description}
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="text-sm text-slate">
                             {CATEGORY_LABELS[anomaly.expense.category] || anomaly.expense.category || 'Unknown'} • {format(new Date(anomaly.expense.date), 'MMM dd, yyyy')}
                           </p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          anomaly.severity === 'high' ? 'bg-red-500 text-white' :
-                          anomaly.severity === 'medium' ? 'bg-orange-500 text-white' :
-                          'bg-yellow-500 text-gray-900'
+                          anomaly.severity === 'high' ? 'bg-ember text-white' :
+                          anomaly.severity === 'medium' ? 'bg-brass text-white' :
+                          'bg-brass text-ink'
                         }`}>
                           {anomaly.severity.toUpperCase()}
                         </span>
@@ -925,26 +926,26 @@ export default function AnalyticsDashboard({ expenses }: AnalyticsDashboardProps
                       
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Amount</p>
-                          <p className="text-lg font-bold text-gray-900 dark:text-white">
+                          <p className="text-xs text-slate mb-1">Amount</p>
+                          <p className="text-lg font-bold text-ink">
                             {formatCurrency(anomaly.expense.amount)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Category Avg</p>
-                          <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                          <p className="text-xs text-slate mb-1">Category Avg</p>
+                          <p className="text-lg font-medium text-ink/80">
                             {formatCurrency(anomaly.categoryAvg)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Z-Score</p>
-                          <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                          <p className="text-xs text-slate mb-1">Z-Score</p>
+                          <p className="text-lg font-medium text-ink/80">
                             {anomaly.zScore.toFixed(2)}σ
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Deviation</p>
-                          <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                          <p className="text-xs text-slate mb-1">Deviation</p>
+                          <p className="text-lg font-medium text-ink/80">
                             {((Math.abs(anomaly.expense.amount - anomaly.categoryAvg) / anomaly.categoryAvg) * 100).toFixed(0)}%
                           </p>
                         </div>
