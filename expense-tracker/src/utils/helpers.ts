@@ -1,6 +1,6 @@
-import type { Expense, CategoryType } from '../types';
+import type { Expense, CategoryType, CategoryStats } from '../types';
 import { format, parse, isValid } from 'date-fns';
-import { CATEGORY_GROUPS } from './constants';
+import { CATEGORY_GROUPS, CATEGORY_LABELS, CATEGORY_GROUP_PALETTE } from './constants';
 
 /** Which of the CATEGORY_GROUPS a category belongs to — used to give
  * every category a consistent icon and group color across the redesigned UI. */
@@ -9,6 +9,57 @@ export const getCategoryGroup = (category: CategoryType) =>
 
 export const getCategoryIcon = (category: CategoryType): string =>
   getCategoryGroup(category)?.icon || '💰';
+
+export interface CategoryGroupBreakdown {
+  name: string;
+  icon: string;
+  value: number;
+  count: number;
+  color: string;
+  subcategories: { category: CategoryType; label: string; total: number; count: number }[];
+}
+
+/**
+ * Rolls per-category stats up into per-group totals, colored from the
+ * shared ledger palette (index-based, so a group always reads the same
+ * color regardless of how many groups have spend this period) and sorted
+ * richest-first. This is the one source of truth for "how much did each
+ * category group cost" — the 2D pie chart and the 3D walkthrough's rooms
+ * both build from this, so a category reads the same color and the same
+ * numbers whichever view you're looking at it from.
+ */
+export function getCategoryGroupBreakdown(categoryStats: CategoryStats[]): CategoryGroupBreakdown[] {
+  return CATEGORY_GROUPS.map((group, i) => {
+    const groupTotal = categoryStats
+      .filter((stat) => group.categories.includes(stat.category))
+      .reduce((sum, stat) => sum + stat.total, 0);
+
+    const groupCount = categoryStats
+      .filter((stat) => group.categories.includes(stat.category))
+      .reduce((sum, stat) => sum + stat.count, 0);
+
+    const subcategories = categoryStats
+      .filter((stat) => group.categories.includes(stat.category) && stat.total > 0)
+      .map((stat) => ({
+        category: stat.category,
+        label: CATEGORY_LABELS[stat.category] || stat.category,
+        total: stat.total,
+        count: stat.count,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      name: group.name,
+      icon: group.icon,
+      value: groupTotal,
+      count: groupCount,
+      color: CATEGORY_GROUP_PALETTE[i % CATEGORY_GROUP_PALETTE.length],
+      subcategories,
+    };
+  })
+    .filter((group) => group.value > 0)
+    .sort((a, b) => b.value - a.value);
+}
 
 export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

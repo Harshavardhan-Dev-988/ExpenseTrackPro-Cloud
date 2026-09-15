@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CategoryStats } from '../../types';
-import { CATEGORY_LABELS, CATEGORY_GROUPS } from '../../utils/constants';
-import { formatMoney } from '../../utils/helpers';
+import { formatMoney, getCategoryGroupBreakdown } from '../../utils/helpers';
 import CountUp from '../ui/CountUp';
 
 interface CategoryPieChartProps {
@@ -14,25 +13,6 @@ interface CategoryPieChartProps {
   compact?: boolean;
 }
 
-// A cohesive, muted spectrum drawn from the ledger palette rather than a
-// default rainbow — enough distinct, low-saturation tones to carry ~10
-// category groups without any one of them reading as "the app's color."
-const PALETTE = [
-  '#2F4D3F', // pine
-  '#A9762E', // brass
-  '#5C7A8A', // dusty slate-blue
-  '#9C6B4F', // rust / terracotta (one slice among many, not the identity)
-  '#6B8F71', // sage
-  '#7C6A9C', // muted plum
-  '#C9A66B', // sand
-  '#8C5A5A', // dusty rose
-  '#3E6E7E', // muted teal
-  '#8C9A8C', // sage-grey
-  '#B3492F', // ember
-  '#5A6B8C', // slate-navy
-  '#4F7942', // fern
-];
-
 const RADIAN = Math.PI / 180;
 
 export default function CategoryPieChart({ categoryStats, currency, compact = false }: CategoryPieChartProps) {
@@ -42,38 +22,11 @@ export default function CategoryPieChart({ categoryStats, currency, compact = fa
   const [tooltipData, setTooltipData] = useState<any>(null);
   const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Group categories by their main category group, colored from the ledger
-  // palette above (index-based, so the same group reads the same color
-  // every time regardless of how many groups have spend this period).
-  const chartData = CATEGORY_GROUPS.map((group, i) => {
-    const groupTotal = categoryStats
-      .filter(stat => group.categories.includes(stat.category))
-      .reduce((sum, stat) => sum + stat.total, 0);
-
-    const groupCount = categoryStats
-      .filter(stat => group.categories.includes(stat.category))
-      .reduce((sum, stat) => sum + stat.count, 0);
-
-    const subcategories = categoryStats
-      .filter(stat => group.categories.includes(stat.category) && stat.total > 0)
-      .map(stat => ({
-        category: stat.category,
-        label: CATEGORY_LABELS[stat.category] || stat.category,
-        total: stat.total,
-        count: stat.count,
-      }))
-      .sort((a, b) => b.total - a.total);
-
-    return {
-      name: group.name,
-      value: groupTotal,
-      count: groupCount,
-      color: PALETTE[i % PALETTE.length],
-      subcategories,
-    };
-  })
-    .filter(group => group.value > 0)
-    .sort((a, b) => b.value - a.value);
+  // Group categories by their main category group, colored from the shared
+  // ledger palette (index-based, so the same group reads the same color
+  // every time regardless of how many groups have spend this period, and
+  // matches the color that group's room uses in the 3D walkthrough).
+  const chartData = getCategoryGroupBreakdown(categoryStats);
 
   const totalAmount = chartData.reduce((sum, item) => sum + item.value, 0);
 

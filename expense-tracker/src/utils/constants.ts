@@ -203,6 +203,27 @@ export const CATEGORY_LABELS: Record<CategoryType, string> = {
   other: 'Other',
 };
 
+// A cohesive, muted spectrum drawn from the ledger palette rather than a
+// default rainbow — enough distinct, low-saturation tones to carry every
+// category group without any one of them reading as "the app's color."
+// Shared by the category pie chart and the 3D walkthrough's rooms so the
+// same group always reads as the same color everywhere in the app.
+export const CATEGORY_GROUP_PALETTE = [
+  '#2F4D3F', // pine
+  '#A9762E', // brass
+  '#5C7A8A', // dusty slate-blue
+  '#9C6B4F', // rust / terracotta (one slice among many, not the identity)
+  '#6B8F71', // sage
+  '#7C6A9C', // muted plum
+  '#C9A66B', // sand
+  '#8C5A5A', // dusty rose
+  '#3E6E7E', // muted teal
+  '#8C9A8C', // sage-grey
+  '#B3492F', // ember
+  '#5A6B8C', // slate-navy
+  '#4F7942', // fern
+];
+
 export const PAYMENT_METHOD_LABELS = {
   cash: 'Cash',
   card: 'Card',

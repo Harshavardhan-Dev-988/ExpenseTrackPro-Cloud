@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useExpenses } from './hooks/useExpenses';
 import { useSettings } from './hooks/useSettings';
@@ -12,6 +12,7 @@ import DailyExpensesChart from './components/charts/DailyExpensesChart';
 import WeekdaySpendingChart from './components/charts/WeekdaySpendingChart';
 import LedgerLineChart from './components/charts/LedgerLineChart';
 import CategoryBreakdown from './components/dashboard/CategoryBreakdown';
+import CategoryExpensesModal from './components/dashboard/CategoryExpensesModal';
 import RecentActivity from './components/dashboard/RecentActivity';
 import StatTile from './components/ui/StatTile';
 import CountUp from './components/ui/CountUp';
@@ -23,6 +24,10 @@ import BudgetAlerts from './components/budgets/BudgetAlerts';
 import BudgetsView from './components/budgets/BudgetsView';
 import BackupRestore from './components/backup/BackupRestore';
 import PDFReportGenerator from './components/reports/PDFReportGenerator';
+// Lazy-loaded: three.js + @react-three/fiber are a sizeable chunk that
+// only the "Walk through" button ever needs — nobody who just wants to
+// check a total should pay for it on first load.
+const Walkthrough3D = lazy(() => import('./components/walkthrough/Walkthrough3D'));
 import SavingsTracker from './components/savings/SavingsTracker';
 import { generateId, formatMoney } from './utils/helpers';
 import { db } from './services/db';
@@ -51,8 +56,14 @@ function App() {
   const [showBudgetManager, setShowBudgetManager] = useState(false);
   const [showBackupRestore, setShowBackupRestore] = useState(false);
   const [showPDFGenerator, setShowPDFGenerator] = useState(false);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  // "Where it went" → click a category → this popup with every entry
+  // behind that bar. quickAddCategory pre-selects a category when the
+  // popup's own "+ Add" button opens the same ExpenseForm used everywhere else.
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType | null>(null);
+  const [quickAddCategory, setQuickAddCategory] = useState<CategoryType | undefined>(undefined);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [justRecorded, setJustRecorded] = useState<{ amount: number; description: string } | null>(null);
   const [dashboardDateRange, setDashboardDateRange] = useState<{
@@ -355,6 +366,7 @@ function App() {
       await addExpense(expenseData);
     }
     setShowExpenseForm(false);
+    setQuickAddCategory(undefined);
 
     // A quiet "entry recorded" moment instead of a generic toast — the
     // ledger acknowledging the line that was just written.
@@ -366,8 +378,19 @@ function App() {
   };
 
   const handleEditExpense = (expense: Expense) => {
+    setSelectedCategory(null);
     setEditingExpense(expense);
     setShowExpenseForm(true);
+  };
+
+  const openAddExpenseForm = (category?: CategoryType) => {
+    setEditingExpense(null);
+    setQuickAddCategory(category);
+    setShowExpenseForm(true);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    deleteExpense(id);
   };
 
   const handleBulkUpload = async (expensesData: Array<any>) => {
@@ -427,7 +450,7 @@ function App() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-2.5">
-              <button onClick={() => setShowExpenseForm(true)} className={btnPrimary}>
+              <button onClick={() => openAddExpenseForm()} className={btnPrimary}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                 </svg>
@@ -615,6 +638,19 @@ function App() {
                 </Fragment>
               )}
 
+              {dashboardExpenses.length > 0 && (
+                <motion.button
+                  type="button"
+                  onClick={() => setShowWalkthrough(true)}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-surface text-xs font-medium text-ink hover:border-pine hover:text-pine-strong transition-colors"
+                >
+                  <span aria-hidden="true">🚶</span>
+                  Walk through
+                </motion.button>
+              )}
+
               <span className="ml-auto text-xs font-mono text-slate">
                 {getDashboardDateRangeText()} · {dashboardExpenses.length} entr{dashboardExpenses.length !== 1 ? 'ies' : 'y'}
               </span>
@@ -633,7 +669,7 @@ function App() {
                     View all time
                   </button>
                 ) : (
-                  <button onClick={() => setShowExpenseForm(true)} className={btnPrimary}>
+                  <button onClick={() => openAddExpenseForm()} className={btnPrimary}>
                     Add your first expense
                   </button>
                 )}
@@ -685,7 +721,12 @@ function App() {
                     transition={{ duration: 0.5, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <h2 className="font-display text-lg font-semibold text-ink mb-4">Where it went</h2>
-                    <CategoryBreakdown stats={categoryStats.filter(s => s.total > 0)} total={totalExpenses} currency={settings.currency} />
+                    <CategoryBreakdown
+                      stats={categoryStats.filter(s => s.total > 0)}
+                      total={totalExpenses}
+                      currency={settings.currency}
+                      onSelectCategory={setSelectedCategory}
+                    />
                   </motion.section>
 
                   <motion.section
@@ -857,7 +898,7 @@ function App() {
                 <h2 className="text-xl font-display font-semibold text-ink mb-2">No expenses yet</h2>
                 <p className="text-sm text-slate mb-6">Start by adding your first expense or importing data in bulk.</p>
                 <div className="flex flex-col sm:flex-row justify-center gap-3">
-                  <button onClick={() => setShowExpenseForm(true)} className={btnPrimary}>Add expense</button>
+                  <button onClick={() => openAddExpenseForm()} className={btnPrimary}>Add expense</button>
                   <button onClick={() => setShowBulkUpload(true)} className={btnSecondary}>Import data</button>
                 </div>
               </div>
@@ -902,10 +943,12 @@ function App() {
       {showExpenseForm && (
         <ExpenseForm
           expense={editingExpense || undefined}
+          initialCategory={quickAddCategory}
           onSubmit={handleAddExpense}
           onCancel={() => {
             setShowExpenseForm(false);
             setEditingExpense(null);
+            setQuickAddCategory(undefined);
           }}
         />
       )}
@@ -938,6 +981,55 @@ function App() {
       {showPDFGenerator && (
         <PDFReportGenerator expenses={expenses} budgets={budgets} onClose={() => setShowPDFGenerator(false)} />
       )}
+
+      {/* Category Detail Modal — opened from any "Where it went" row, this
+          is every entry behind that category's bar for the dashboard's
+          current period, with search, sort, and edit/delete/add inline. */}
+      <AnimatePresence>
+        {selectedCategory && (
+          <CategoryExpensesModal
+            category={selectedCategory}
+            expenses={dashboardExpenses.filter((e) => e.category === selectedCategory)}
+            periodTotal={totalExpenses}
+            currency={settings.currency}
+            onClose={() => setSelectedCategory(null)}
+            onEdit={handleEditExpense}
+            onDelete={handleDeleteExpense}
+            onAddNew={(category) => {
+              setSelectedCategory(null);
+              openAddExpenseForm(category);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Walkthrough — the dashboard's numbers as an explorable 3D hall,
+          opened from the dashboard's date-range row. An alternate view,
+          not a replacement: closing it always returns to the same 2D
+          dashboard underneath. */}
+      <AnimatePresence>
+        {showWalkthrough && (
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 z-50 bg-paper flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-8 w-8 rounded-full border-2 border-line border-t-pine animate-spin" />
+                  <p className="mt-4 text-sm text-slate font-mono">building the hall…</p>
+                </div>
+              </div>
+            }
+          >
+            <Walkthrough3D
+              categoryStats={categoryStats.filter((s) => s.total > 0)}
+              currency={settings.currency}
+              totalAmount={totalExpenses}
+              totalEntries={dashboardExpenses.length}
+              periodLabel={getDashboardDateRangeText()}
+              onClose={() => setShowWalkthrough(false)}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

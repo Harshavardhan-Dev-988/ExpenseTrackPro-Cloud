@@ -5,6 +5,10 @@ import { CATEGORY_GROUPS, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../u
 
 interface ExpenseFormProps {
   expense?: Expense;
+  /** Pre-selects a category when opening the form fresh (e.g. "+ Add
+   * expense" from inside a category's own detail popup) — ignored once
+   * `expense` is set, since editing an entry always shows its own category. */
+  initialCategory?: CategoryType;
   onSubmit: (expense: {
     date: Date;
     amount: number;
@@ -33,10 +37,10 @@ const PAYMENT_ICONS: Record<PaymentMethod, string> = {
  * so the app's 80-category taxonomy stays browsable instead of a giant
  * alphabetic dropdown.
  */
-export default function ExpenseForm({ expense, onSubmit, onCancel }: ExpenseFormProps) {
+export default function ExpenseForm({ expense, initialCategory, onSubmit, onCancel }: ExpenseFormProps) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<CategoryType>('grocery');
+  const [category, setCategory] = useState<CategoryType>(initialCategory ?? 'grocery');
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [tags, setTags] = useState('');
