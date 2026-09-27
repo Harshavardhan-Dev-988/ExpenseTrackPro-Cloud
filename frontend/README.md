@@ -141,7 +141,7 @@ Click the **"📥 Export"** button in the header and choose:
 ## 🗂️ Project Structure
 
 ```
-expense-tracker/
+frontend/
 ├── src/
 │   ├── components/
 │   │   ├── charts/          # Chart components

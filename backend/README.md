@@ -106,10 +106,10 @@ As of the last deploy, the `dev` stage is live in `ap-southeast-2`:
 
 ## 5. Deploy the frontend (S3 + CloudFront)
 
-The React app (`../expense-tracker`) is a static build hosted behind CloudFront — `FrontendStack` provisions a private S3 bucket plus a CloudFront distribution in front of it, and uploads whatever's in `expense-tracker/dist-aws` on every deploy.
+The React app (`../frontend`) is a static build hosted behind CloudFront — `FrontendStack` provisions a private S3 bucket plus a CloudFront distribution in front of it, and uploads whatever's in `frontend/dist-aws` on every deploy.
 
 ```bash
-cd expense-tracker
+cd frontend
 npm install
 npm run build:aws   # vite build --base=/ --outDir dist-aws (root-relative paths, not the GitHub Pages subpath)
 

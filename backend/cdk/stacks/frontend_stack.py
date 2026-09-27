@@ -7,7 +7,7 @@ the built app on every `cdk deploy` and invalidates the CloudFront cache so
 visitors see the new build immediately instead of a stale cached one.
 
 This expects the frontend to already be built for this deployment target —
-see `../../../expense-tracker/package.json`'s `build:aws` script, which
+see `../../../frontend/package.json`'s `build:aws` script, which
 builds with `--base=/` (the default `vite.config.ts` base of
 `/ExpenseTrack-Pro/` is for the existing GitHub Pages deploy and would
 break asset paths if served from a CloudFront distribution's root).
@@ -22,7 +22,7 @@ from aws_cdk import aws_s3_deployment as s3deploy
 from constructs import Construct
 
 FRONTEND_BUILD_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "expense-tracker", "dist-aws"
+    os.path.dirname(__file__), "..", "..", "..", "frontend", "dist-aws"
 )
 
 
