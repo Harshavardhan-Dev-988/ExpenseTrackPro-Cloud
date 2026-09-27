@@ -9,7 +9,7 @@ Gateway's Cognito authorizer once deployed; see dependencies/auth.py).
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import budgets, expenses, health, savings, settings
+from routers import budgets, expenses, health, receipts, savings, settings
 
 app = FastAPI(title="ExpenseTrack Pro API", version="0.1.0")
 
@@ -32,3 +32,4 @@ app.include_router(expenses.router)
 app.include_router(settings.router)
 app.include_router(savings.router)
 app.include_router(budgets.router)
+app.include_router(receipts.router)
