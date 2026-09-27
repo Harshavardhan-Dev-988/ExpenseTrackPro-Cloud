@@ -14,8 +14,9 @@ from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
-from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from constructs import Construct
+
+from .local_bundling import LocalApiBundling
 
 API_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "api")
 
@@ -35,13 +36,21 @@ class ApiStack(cdk.Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        fn = PythonFunction(
+        fn = _lambda.Function(
             self,
             "ApiFunction",
-            entry=API_DIR,
             runtime=_lambda.Runtime.PYTHON_3_12,
-            index="lambda_handler.py",
-            handler="handler",
+            architecture=_lambda.Architecture.X86_64,
+            handler="lambda_handler.handler",
+            code=_lambda.Code.from_asset(
+                API_DIR,
+                bundling=cdk.BundlingOptions(
+                    # `image` is required by the type but is only reached if
+                    # `local.try_bundle` returns False — it never is here.
+                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                    local=LocalApiBundling(API_DIR),
+                ),
+            ),
             timeout=cdk.Duration.seconds(15),
             memory_size=256,
             environment={
@@ -90,7 +99,7 @@ class ApiStack(cdk.Stack):
             path="/health",
             methods=[apigwv2.HttpMethod.GET],
             integration=apigwv2_integrations.HttpLambdaIntegration("HealthIntegration", fn),
-            authorizer=apigwv2_authorizers.HttpNoneAuthorizer(),
+            authorizer=apigwv2.HttpNoneAuthorizer(),
         )
 
         self.api_url = http_api.api_endpoint

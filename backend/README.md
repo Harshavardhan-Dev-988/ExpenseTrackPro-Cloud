@@ -83,9 +83,24 @@ cdk bootstrap --profile expense-track-pro        # once per AWS account/region
 cdk deploy --all --profile expense-track-pro
 ```
 
-`PythonFunction` (the construct that packages the FastAPI Lambda) uses Docker to install dependencies in a Lambda-compatible environment by default. If Docker Desktop isn't running, either start it or ask me to wire up local (non-Docker) bundling instead.
+The Lambda's dependencies are installed without Docker: `cdk/stacks/local_bundling.py` runs `pip install --platform manylinux2014_x86_64 --only-binary=:all:`, which fetches the same prebuilt Lambda-compatible wheels a Docker-based build would, straight onto whatever machine runs `cdk deploy`. No Docker Desktop required.
 
 `cdk deploy` prints outputs when it finishes: `UserPoolId`, `UserPoolClientId`, `HostedUiDomainUrl`, `TableName`, `ReceiptsBucketName`, `ApiUrl`. Save those — phase 2 wires the frontend up to them.
+
+### Already deployed (dev stage)
+
+As of the last deploy, the `dev` stage is live in `ap-southeast-2`:
+
+| Output | Value |
+|---|---|
+| `ApiUrl` | `https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com` |
+| `UserPoolId` | `ap-southeast-2_f6zD79Um0` |
+| `UserPoolClientId` | `4m6v1tcrennnmftkvvhvkbilnv` |
+| `HostedUiDomainUrl` | `https://expense-track-pro-dev.auth.ap-southeast-2.amazoncognito.com` |
+| `TableName` | `expense-track-pro-dev` |
+| `ReceiptsBucketName` | `expense-track-pro-receipts-dev-719312763274` |
+
+`curl https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com/health` returns `{"status":"ok"}`; hitting any other route without a Cognito token correctly returns `401`. These values are what phase 2 will wire the frontend to.
 
 ## What's deliberately not here yet
 
