@@ -1,4 +1,4 @@
-import { db } from './db';
+import { cloudApi as db } from './cloudApi';
 import type { Expense, CategoryBudget, Settings, CategoryType } from '../types';
 import { CATEGORY_LABELS } from '../utils/constants';
 

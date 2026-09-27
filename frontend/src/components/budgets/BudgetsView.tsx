@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { CategoryType, CategoryBudget, Expense } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/constants';
 import { formatMoney } from '../../utils/helpers';
-import { db } from '../../services/db';
+import { cloudApi as db } from '../../services/cloudApi';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import BudgetAlerts from './BudgetAlerts';
 

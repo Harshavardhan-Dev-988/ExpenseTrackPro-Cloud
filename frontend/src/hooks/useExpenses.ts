@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Expense, FilterOptions } from '../types';
-import db from '../services/db';
+import db from '../services/cloudApi';
 import { generateId } from '../utils/helpers';
 
 export const useExpenses = (filters?: FilterOptions) => {

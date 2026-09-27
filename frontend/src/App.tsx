@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, Fragment, lazy, Suspense } from '
 import { motion, AnimatePresence } from 'framer-motion';
 import { useExpenses } from './hooks/useExpenses';
 import { useSettings } from './hooks/useSettings';
+import { useAuth } from './hooks/useAuth';
 import { useAnalytics } from './hooks/useAnalytics';
 import ExpenseForm from './components/forms/ExpenseForm';
 import ExpenseList from './components/expenses/ExpenseList';
@@ -30,7 +31,7 @@ import PDFReportGenerator from './components/reports/PDFReportGenerator';
 const Walkthrough3D = lazy(() => import('./components/walkthrough/Walkthrough3D'));
 import SavingsTracker from './components/savings/SavingsTracker';
 import { generateId, formatMoney } from './utils/helpers';
-import { db } from './services/db';
+import { cloudApi as db } from './services/cloudApi';
 import { CATEGORY_LABELS } from './utils/constants';
 import type { Expense, CategoryType, PaymentMethod, CategoryBudget } from './types';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
@@ -108,6 +109,7 @@ function App() {
   };
 
   const { settings, loading: settingsLoading, error: settingsError, updateSettings } = useSettings();
+  const { signOut } = useAuth();
   const { expenses, loading: expensesLoading, error: expensesError, addExpense, addExpenses, updateExpense, deleteExpense } = useExpenses();
 
   // Resolve 'system' to an actual light/dark reading so the toggle button
@@ -491,6 +493,16 @@ function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                   </svg>
                 )}
+              </button>
+              <button
+                onClick={() => signOut()}
+                className="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-line bg-surface text-ink hover:border-ember hover:text-ember active:scale-[0.98] transition-all duration-200 shrink-0"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
               </button>
             </div>
           </div>

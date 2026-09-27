@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '../../services/db';
+import { cloudApi as db } from '../../services/cloudApi';
 import { generateId, formatMoney } from '../../utils/helpers';
 import { SAVINGS_CATEGORY_LABELS } from '../../utils/constants';
 import type { SavingsEntry, SavingsGoal, SavingsCategory, Expense } from '../../types';

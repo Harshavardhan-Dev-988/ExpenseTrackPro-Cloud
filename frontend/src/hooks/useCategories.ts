@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CategoryBudget, CategoryType } from '../types';
-import db from '../services/db';
+import db from '../services/cloudApi';
 
 export const useCategories = () => {
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);

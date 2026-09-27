@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { CategoryType, CategoryBudget } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/constants';
-import { db } from '../../services/db';
+import { cloudApi as db } from '../../services/cloudApi';
 
 interface BudgetManagerProps {
   currentSpending: Record<CategoryType, number>;

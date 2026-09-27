@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Settings } from '../types';
-import db from '../services/db';
+import db from '../services/cloudApi';
 
 // The category taxonomy (UPI, agri_* categories, festival gifting, PPF/NPS
 // savings) and every hardcoded formatter elsewhere in this app assume an
