@@ -119,4 +119,6 @@ class ApiStack(cdk.Stack):
         )
 
         self.api_url = http_api.api_endpoint
+        self.fn = fn
+        self.http_api = http_api
         cdk.CfnOutput(self, "ApiUrl", value=http_api.api_endpoint)
