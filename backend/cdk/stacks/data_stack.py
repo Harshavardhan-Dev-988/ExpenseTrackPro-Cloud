@@ -5,9 +5,17 @@ Table design (single-table, per Section 5 of the roadmap doc):
   PK = "USER#<userId>"          SK = "EXPENSE#<expenseId>"   -> one expense
   PK = "USER#<userId>"          SK = "SAVINGS_ENTRY#<id>"    -> one savings entry
   PK = "USER#<userId>"          SK = "SAVINGS_GOAL#<id>"     -> one savings goal
+  PK = "USER#<userId>"          SK = "WHATSAPP_LINK"          -> {phoneNumber} (phase 4:
+                                                                 reverse lookup for the
+                                                                 app's own "linked/unlink" UI)
   PK = "WHATSAPP#<e164number>"  SK = "LINK"                  -> {userId} (phase 4:
                                                                  looks up who a text
                                                                  came from, no GSI needed)
+  PK = "LINKCODE#<code>"        SK = "PENDING"                -> {userId, ttl} (phase 4:
+                                                                 a one-time code minted from
+                                                                 the app, redeemed by texting
+                                                                 "LINK <code>" from WhatsApp;
+                                                                 expires via the table's TTL)
 
 Every query the app makes is "give me one partition" (a user's items, or one
 phone number's link), so no secondary indexes are needed yet — see the
@@ -35,6 +43,12 @@ class DataStack(cdk.Stack):
             billing=dynamodb.Billing.on_demand(),  # pay-per-request: scales to zero, no capacity to size
             point_in_time_recovery=(stage == "prod"),
             removal_policy=removal_policy,
+            # Only WhatsApp link codes (phase 4) set this attribute today -
+            # a short-lived one-time code that should disappear on its own
+            # a few minutes after it expires, rather than living forever as
+            # dead rows. Every other item type simply never sets `ttl`, so
+            # this has no effect on them.
+            time_to_live_attribute="ttl",
         )
 
         # Receipt photos, attached to an expense via its `receiptUrl` field.

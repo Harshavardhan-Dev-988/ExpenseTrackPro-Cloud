@@ -20,6 +20,18 @@ from .local_bundling import LocalApiBundling
 
 API_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "api")
 
+# Twilio Auth Token, read from Secrets Manager via a CloudFormation dynamic
+# reference (never plaintext in this template or in git) - same pattern as
+# the Google OAuth client secret in auth_stack.py. `unsafe_unwrap()` is safe
+# here specifically because Lambda environment variable VALUES are a
+# documented dynamic-reference target: CloudFormation resolves the token at
+# deploy time, so the actual secret still never appears in the synthesized
+# template, only `{{resolve:secretsmanager:...}}`.
+TWILIO_AUTH_TOKEN_SECRET_NAME = "expense-track-pro/twilio-auth-token"
+# Twilio's shared WhatsApp Sandbox number - the same for every developer
+# account. Overridable once/if this moves to a dedicated business number.
+TWILIO_WHATSAPP_NUMBER = "+14155238886"
+
 
 class ApiStack(cdk.Stack):
     def __init__(
@@ -57,6 +69,10 @@ class ApiStack(cdk.Stack):
                 "TABLE_NAME": table.table_name,
                 "RECEIPTS_BUCKET_NAME": receipts_bucket.bucket_name,
                 "STAGE": stage,
+                "TWILIO_AUTH_TOKEN": cdk.SecretValue.secrets_manager(
+                    TWILIO_AUTH_TOKEN_SECRET_NAME
+                ).unsafe_unwrap(),
+                "TWILIO_WHATSAPP_NUMBER": TWILIO_WHATSAPP_NUMBER,
             },
         )
         table.grant_read_write_data(fn)
@@ -115,6 +131,19 @@ class ApiStack(cdk.Stack):
             path="/health",
             methods=[apigwv2.HttpMethod.GET],
             integration=apigwv2_integrations.HttpLambdaIntegration("HealthIntegration", fn),
+            authorizer=apigwv2.HttpNoneAuthorizer(),
+        )
+
+        # Twilio calls this directly and can't send a Cognito JWT, so it
+        # can't sit behind the default authorizer either - this literal
+        # route is matched ahead of the /{proxy+} catch-all (API Gateway
+        # prefers the more specific path), same as /health above. The
+        # router itself (routers/whatsapp.py) verifies every request's
+        # X-Twilio-Signature before trusting anything in the body.
+        http_api.add_routes(
+            path="/whatsapp/webhook",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=apigwv2_integrations.HttpLambdaIntegration("WhatsAppWebhookIntegration", fn),
             authorizer=apigwv2.HttpNoneAuthorizer(),
         )
 

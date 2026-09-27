@@ -24,6 +24,7 @@ import BudgetManager from './components/budgets/BudgetManager';
 import BudgetAlerts from './components/budgets/BudgetAlerts';
 import BudgetsView from './components/budgets/BudgetsView';
 import BackupRestore from './components/backup/BackupRestore';
+import WhatsAppLink from './components/whatsapp/WhatsAppLink';
 import PDFReportGenerator from './components/reports/PDFReportGenerator';
 // Lazy-loaded: three.js + @react-three/fiber are a sizeable chunk that
 // only the "Walk through" button ever needs — nobody who just wants to
@@ -56,6 +57,7 @@ function App() {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showBudgetManager, setShowBudgetManager] = useState(false);
   const [showBackupRestore, setShowBackupRestore] = useState(false);
+  const [showWhatsAppLink, setShowWhatsAppLink] = useState(false);
   const [showPDFGenerator, setShowPDFGenerator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -470,6 +472,12 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                 </svg>
                 Backup
+              </button>
+              <button onClick={() => setShowWhatsAppLink(true)} className={btnSecondary}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12a4 4 0 108 0 4 4 0 00-8 0zm9.5 6.5L21 21m-3-10a8 8 0 11-16 0 8 8 0 0116 0z" />
+                </svg>
+                WhatsApp
               </button>
               <ExportMenu
                 expenses={expenses}
@@ -988,6 +996,11 @@ function App() {
           onClose={() => setShowBackupRestore(false)}
           onRestoreComplete={() => window.location.reload()}
         />
+      )}
+
+      {/* Link WhatsApp Modal */}
+      {showWhatsAppLink && (
+        <WhatsAppLink onClose={() => setShowWhatsAppLink(false)} />
       )}
 
       {/* PDF Report Generator Modal */}

@@ -19,6 +19,17 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
 import type { CategoryBudget, Expense, SavingsEntry, SavingsGoal, Settings } from '../types';
 
+export interface WhatsAppLinkCode {
+  code: string;
+  expiresInSeconds: number;
+  sandboxNumber: string;
+}
+
+export interface WhatsAppStatus {
+  linked: boolean;
+  phoneNumber?: string;
+}
+
 const API_BASE_URL = 'https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com';
 
 async function authHeader(): Promise<Record<string, string>> {
@@ -260,6 +271,23 @@ class CloudApiService {
     // backend route matches the rest of the path as-is, so it goes in
     // unencoded here, not as a query param.
     await request(`/receipts/${key}`, { method: 'DELETE' });
+  }
+
+  // ===== WHATSAPP LINKING (phase 4) =====
+  // A phone number is only ever linked by redeeming a code minted here from
+  // a signed-in session - the actual redemption ("LINK <code>") happens
+  // entirely over WhatsApp, handled by the backend's /whatsapp/webhook.
+
+  async createWhatsAppLinkCode(): Promise<WhatsAppLinkCode> {
+    return request<WhatsAppLinkCode>('/whatsapp/link-code', { method: 'POST' });
+  }
+
+  async getWhatsAppStatus(): Promise<WhatsAppStatus> {
+    return request<WhatsAppStatus>('/whatsapp/status');
+  }
+
+  async unlinkWhatsApp(): Promise<void> {
+    await request('/whatsapp/link', { method: 'DELETE' });
   }
 }
 

@@ -15,7 +15,7 @@ guardrail against typos; the API just checks "is this a non-empty string".
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # ---- Expenses ---------------------------------------------------------
@@ -150,8 +150,7 @@ class Budget(BaseModel):
     alertThreshold: float = 80
     isActive: bool = True
 
-
-# ---- WhatsApp linking (phase 4) -----------------------------------------
-
-class WhatsAppLinkCreate(BaseModel):
-    phoneNumber: str = Field(..., description="E.164 format, e.g. +919812345678")
+# WhatsApp linking (phase 4) request/response models live in
+# routers/whatsapp.py itself, next to the routes that use them - same
+# convention as receipts.py's UploadUrlRequest/Response, since nothing else
+# needs to import them.
