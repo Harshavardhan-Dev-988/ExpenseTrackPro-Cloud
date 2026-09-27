@@ -64,10 +64,12 @@ class AuthStack(cdk.Stack):
                 callback_urls=[
                     "http://localhost:5173/",
                     "http://localhost:5193/",
+                    "https://d3bttra9tv41h7.cloudfront.net/",
                 ],
                 logout_urls=[
                     "http://localhost:5173/",
                     "http://localhost:5193/",
+                    "https://d3bttra9tv41h7.cloudfront.net/",
                 ],
             ),
             supported_identity_providers=[cognito.UserPoolClientIdentityProvider.COGNITO],

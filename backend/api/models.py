@@ -136,6 +136,21 @@ class SavingsGoal(BaseModel):
     createdAt: datetime
 
 
+# ---- Budgets --------------------------------------------------------------
+
+# One budget per category, keyed by `category` itself (not a generated id) -
+# there's only ever one active budget per category, so "create" and "update"
+# are the same operation: an upsert at PUT /budgets/{category}.
+
+class Budget(BaseModel):
+    category: str
+    monthlyLimit: Optional[float] = None
+    yearlyLimit: Optional[float] = None
+    budgetType: str = "monthly"
+    alertThreshold: float = 80
+    isActive: bool = True
+
+
 # ---- WhatsApp linking (phase 4) -----------------------------------------
 
 class WhatsAppLinkCreate(BaseModel):

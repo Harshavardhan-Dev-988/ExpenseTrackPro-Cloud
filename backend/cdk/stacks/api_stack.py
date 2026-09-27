@@ -73,7 +73,11 @@ class ApiStack(cdk.Stack):
             "HttpApi",
             api_name=f"expense-track-pro-{stage}",
             cors_preflight=apigwv2.CorsPreflightOptions(
-                allow_origins=["http://localhost:5173", "http://localhost:5193"],
+                allow_origins=[
+                    "http://localhost:5173",
+                    "http://localhost:5193",
+                    "https://d3bttra9tv41h7.cloudfront.net",
+                ],
                 allow_methods=[
                     apigwv2.CorsHttpMethod.GET,
                     apigwv2.CorsHttpMethod.POST,
@@ -86,9 +90,21 @@ class ApiStack(cdk.Stack):
             default_authorizer=authorizer,
         )
 
+        # Explicit methods (not ANY) so OPTIONS is left unmatched here and
+        # falls through to API Gateway's own built-in CORS preflight
+        # responder. ANY would swallow OPTIONS into this route too, sending
+        # preflight requests through the Cognito authorizer and failing them
+        # with 401 - breaking every real cross-origin PUT/DELETE/Authorization
+        # request from the browser.
         http_api.add_routes(
             path="/{proxy+}",
-            methods=[apigwv2.HttpMethod.ANY],
+            methods=[
+                apigwv2.HttpMethod.GET,
+                apigwv2.HttpMethod.POST,
+                apigwv2.HttpMethod.PUT,
+                apigwv2.HttpMethod.DELETE,
+                apigwv2.HttpMethod.PATCH,
+            ],
             integration=apigwv2_integrations.HttpLambdaIntegration("ApiIntegration", fn),
         )
 

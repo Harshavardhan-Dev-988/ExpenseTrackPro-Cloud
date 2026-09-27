@@ -50,7 +50,11 @@ class DataStack(cdk.Stack):
             cors=[
                 s3.CorsRule(
                     allowed_methods=[s3.HttpMethods.PUT, s3.HttpMethods.GET],
-                    allowed_origins=["http://localhost:5173", "http://localhost:5193"],
+                    allowed_origins=[
+                        "http://localhost:5173",
+                        "http://localhost:5193",
+                        "https://d3bttra9tv41h7.cloudfront.net",
+                    ],
                     allowed_headers=["*"],
                     max_age=3000,
                 )
