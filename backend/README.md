@@ -17,6 +17,8 @@ backend/
       auth_stack.py     Cognito User Pool
       data_stack.py     DynamoDB table + S3 receipts bucket
       api_stack.py      Lambda + HTTP API + Cognito authorizer
+      frontend_stack.py S3 + CloudFront hosting for the built React app
+      local_bundling.py Docker-free dependency bundling for the API Lambda
 ```
 
 ## 1. AWS account
@@ -102,9 +104,28 @@ As of the last deploy, the `dev` stage is live in `ap-southeast-2`:
 
 `curl https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com/health` returns `{"status":"ok"}`; hitting any other route without a Cognito token correctly returns `401`. These values are what phase 2 will wire the frontend to.
 
+## 5. Deploy the frontend (S3 + CloudFront)
+
+The React app (`../expense-tracker`) is a static build hosted behind CloudFront — `FrontendStack` provisions a private S3 bucket plus a CloudFront distribution in front of it, and uploads whatever's in `expense-tracker/dist-aws` on every deploy.
+
+```bash
+cd expense-tracker
+npm install
+npm run build:aws   # vite build --base=/ --outDir dist-aws (root-relative paths, not the GitHub Pages subpath)
+
+cd ../backend/cdk
+cdk deploy ExpenseTrack-Frontend-dev --profile expense-track-pro
+```
+
+`cdk deploy` prints `SiteUrl` (the CloudFront URL) and `SiteBucketName`. As of the last deploy: **https://d3bttra9tv41h7.cloudfront.net**
+
+Re-run `npm run build:aws` + `cdk deploy ExpenseTrack-Frontend-dev` any time you want to publish a new build — the deployment also invalidates CloudFront's cache, so visitors see the update immediately rather than a stale cached copy.
+
+The frontend still talks to IndexedDB only (phase 2 wires it up to the live API above), so what's hosted here today is the same local-only app, just served from AWS instead of GitHub Pages.
+
 ## What's deliberately not here yet
 
-- The frontend doesn't call this API at all yet (`useExpenses`/`useSettings` still talk to IndexedDB) — that's phase 2.
+- The frontend is hosted on AWS now (S3 + CloudFront, see above) but doesn't call this API yet (`useExpenses`/`useSettings` still talk to IndexedDB) — wiring that up is phase 2.
 - Google/Facebook sign-in — phase 3. The Cognito User Pool and hosted UI domain are already in place for it; adding a provider is additive, no redeploy-breaking changes needed.
 - The WhatsApp webhook route — phase 4. The DynamoDB table already has a key pattern reserved for phone-number → user lookups (see the comment atop `cdk/stacks/data_stack.py`).
 - Receipt upload endpoints (presigned S3 URLs) — the "Hardening" phase. The bucket exists; the routes that hand out upload URLs don't yet.

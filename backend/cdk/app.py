@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """CDK entrypoint for ExpenseTrack Pro's cloud backend.
 
-Deploys three stacks, in dependency order:
-  1. AuthStack  - Cognito User Pool (sign-in/sign-up, social login added in phase 3)
-  2. DataStack  - the single DynamoDB table + the S3 receipts bucket
-  3. ApiStack   - the FastAPI Lambda + HTTP API, wired to both of the above
+Deploys four stacks, in dependency order:
+  1. AuthStack      - Cognito User Pool (sign-in/sign-up, social login added in phase 3)
+  2. DataStack      - the single DynamoDB table + the S3 receipts bucket
+  3. ApiStack       - the FastAPI Lambda + HTTP API, wired to both of the above
+  4. FrontendStack  - S3 + CloudFront hosting for the built React app (independent
+                      of the other three - it just serves static files)
 
 See ../README.md for setup and deploy instructions.
 """
@@ -15,6 +17,7 @@ import aws_cdk as cdk
 from stacks.auth_stack import AuthStack
 from stacks.data_stack import DataStack
 from stacks.api_stack import ApiStack
+from stacks.frontend_stack import FrontendStack
 
 app = cdk.App()
 
@@ -42,7 +45,9 @@ api_stack = ApiStack(
 api_stack.add_dependency(auth_stack)
 api_stack.add_dependency(data_stack)
 
-for stack in (auth_stack, data_stack, api_stack):
+frontend_stack = FrontendStack(app, f"ExpenseTrack-Frontend-{stage}", stage=stage, env=env)
+
+for stack in (auth_stack, data_stack, api_stack, frontend_stack):
     cdk.Tags.of(stack).add("project", "expense-track-pro")
     cdk.Tags.of(stack).add("stage", stage)
 

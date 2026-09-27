@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build:deploy",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "build:aws": "vite build --base=/ --outDir dist-aws"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
