@@ -2,6 +2,16 @@ import { format } from 'date-fns';
 import type { Expense } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/constants';
 import { getCategoryIcon } from '../../utils/helpers';
+import cloudApi from '../../services/cloudApi';
+
+async function openReceipt(key: string) {
+  try {
+    const viewUrl = await cloudApi.getReceiptViewUrl(key);
+    window.open(viewUrl, '_blank', 'noopener,noreferrer');
+  } catch {
+    alert("Couldn't open that receipt right now — try again in a moment.");
+  }
+}
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -60,6 +70,17 @@ export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recen
                   <div className="max-w-xs truncate flex items-center gap-2">
                     <span aria-hidden="true">{getCategoryIcon(expense.category)}</span>
                     <span className="truncate">{expense.description}</span>
+                    {expense.receiptUrl && (
+                      <button
+                        type="button"
+                        onClick={() => openReceipt(expense.receiptUrl!)}
+                        title="View receipt"
+                        aria-label="View attached receipt"
+                        className="text-slate hover:text-pine transition-colors shrink-0"
+                      >
+                        📎
+                      </button>
+                    )}
                   </div>
                   {expense.tags && expense.tags.length > 0 && (
                     <div className="flex gap-1 mt-1">

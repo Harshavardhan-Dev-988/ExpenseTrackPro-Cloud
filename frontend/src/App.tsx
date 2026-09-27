@@ -355,6 +355,7 @@ function App() {
     description: string;
     paymentMethod?: any;
     tags?: string[];
+    receiptUrl?: string;
   }) => {
     const wasEditing = !!editingExpense;
     if (editingExpense) {

@@ -124,7 +124,14 @@ class CloudApiService {
   async updateExpense(expense: Expense): Promise<void> {
     await request(`/expenses/${expense.id}`, {
       method: 'PUT',
-      body: JSON.stringify(expense),
+      // Plain JSON.stringify(expense) would silently DROP any key whose
+      // value is `undefined` (e.g. receiptUrl after removing an attached
+      // receipt) rather than sending it - and the backend's update route
+      // treats an absent key as "leave it alone", so a cleared field would
+      // never actually persist as cleared. The replacer turns every
+      // undefined into an explicit null instead, which the backend does
+      // treat as "clear this field" (see expenses.py's update_expense).
+      body: JSON.stringify(expense, (_key, value) => (value === undefined ? null : value)),
     });
   }
 
@@ -211,6 +218,48 @@ class CloudApiService {
 
   async deleteSavingsGoal(id: string): Promise<void> {
     await request(`/savings/goals/${id}`, { method: 'DELETE' });
+  }
+
+  // ===== RECEIPT PHOTOS =====
+  // The bucket is private - every read or write goes through a short-lived
+  // presigned URL, generated on demand rather than stored. Uploading is two
+  // steps: ask the API for a presigned PUT (this also picks the S3 key,
+  // scoped to the signed-in user), then PUT the raw file bytes straight to
+  // S3 - the file never passes through our own Lambda.
+
+  async uploadReceiptFile(file: File): Promise<string> {
+    const { uploadUrl, key } = await request<{ uploadUrl: string; key: string }>(
+      '/receipts/upload-url',
+      { method: 'POST', body: JSON.stringify({ contentType: file.type }) }
+    );
+
+    // A plain fetch, not the `request()` helper - this goes straight to S3,
+    // which authenticates via the presigned URL's own signature, not our
+    // app's bearer token (S3 would just ignore/reject an Authorization
+    // header meant for our API).
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`Receipt upload failed: ${response.status} ${response.statusText}`);
+    }
+    return key;
+  }
+
+  async getReceiptViewUrl(key: string): Promise<string> {
+    const { viewUrl } = await request<{ viewUrl: string }>(
+      `/receipts/view-url?key=${encodeURIComponent(key)}`
+    );
+    return viewUrl;
+  }
+
+  async deleteReceipt(key: string): Promise<void> {
+    // `key` itself contains slashes (receipts/<userId>/<uuid>.jpg) - the
+    // backend route matches the rest of the path as-is, so it goes in
+    // unencoded here, not as a query param.
+    await request(`/receipts/${key}`, { method: 'DELETE' });
   }
 }
 

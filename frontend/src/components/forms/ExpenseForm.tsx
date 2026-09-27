@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import type { CategoryType, PaymentMethod, Expense } from '../../types';
 import { CATEGORY_GROUPS, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
+import cloudApi from '../../services/cloudApi';
+
+// Kept in sync by hand with backend/api/routers/receipts.py's
+// ALLOWED_CONTENT_TYPES - the backend is the real gate (it rejects anything
+// else when asked for an upload URL), this just gives faster feedback and
+// a sane file-picker filter.
+const ALLOWED_RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 
 interface ExpenseFormProps {
   expense?: Expense;
@@ -16,6 +23,7 @@ interface ExpenseFormProps {
     description: string;
     paymentMethod?: PaymentMethod;
     tags?: string[];
+    receiptUrl?: string;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -48,8 +56,21 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
   const [pickerOpen, setPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+  const [existingReceiptKey, setExistingReceiptKey] = useState<string | undefined>(undefined);
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const amountRef = useRef<HTMLInputElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
+
+  // Revoke the local preview blob URL whenever it changes or the form
+  // unmounts, so we're not leaking object URLs.
+  useEffect(() => {
+    return () => {
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    };
+  }, [receiptPreviewUrl]);
 
   useEffect(() => {
     if (expense) {
@@ -60,10 +81,51 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
       setPaymentMethod(expense.paymentMethod || 'cash');
       setTags(expense.tags?.join(', ') || '');
       setShowTags(!!expense.tags?.length);
+      setExistingReceiptKey(expense.receiptUrl);
+      setReceiptFile(null);
+      setReceiptPreviewUrl(null);
     } else {
       amountRef.current?.focus();
     }
   }, [expense]);
+
+  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // so picking the same file again still fires onChange
+    if (!file) return;
+
+    if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
+      setErrors((prev) => ({ ...prev, receipt: 'Use a JPEG, PNG, WebP or HEIC photo.' }));
+      return;
+    }
+    setErrors((prev) => {
+      const { receipt: _receipt, ...rest } = prev;
+      return rest;
+    });
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptFile(file);
+    setReceiptPreviewUrl(URL.createObjectURL(file));
+    setExistingReceiptKey(undefined);
+  };
+
+  const handleRemoveReceipt = () => {
+    if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+    setReceiptFile(null);
+    setReceiptPreviewUrl(null);
+    // Only clears the association on this entry - doesn't delete the S3
+    // object, so an accidental "Remove" followed by cancel never loses data.
+    setExistingReceiptKey(undefined);
+  };
+
+  const handleViewExistingReceipt = async () => {
+    if (!existingReceiptKey) return;
+    try {
+      const url = await cloudApi.getReceiptViewUrl(existingReceiptKey);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      setErrors((prev) => ({ ...prev, receipt: "Couldn't open that receipt right now." }));
+    }
+  };
 
   const paymentMethods: PaymentMethod[] = ['cash', 'card', 'upi', 'netbanking', 'cheque', 'other'];
   const selectedGroup = CATEGORY_GROUPS.find((g) => g.categories.includes(category));
@@ -83,6 +145,19 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
 
     setIsSubmitting(true);
     try {
+      let receiptUrl = existingReceiptKey;
+      if (receiptFile) {
+        setIsUploadingReceipt(true);
+        try {
+          receiptUrl = await cloudApi.uploadReceiptFile(receiptFile);
+        } catch {
+          setErrors({ submit: "Couldn't upload that receipt — try again." });
+          return;
+        } finally {
+          setIsUploadingReceipt(false);
+        }
+      }
+
       await onSubmit({
         date: new Date(date),
         amount: parseFloat(amount),
@@ -90,6 +165,7 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
         description: description.trim(),
         paymentMethod,
         tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+        receiptUrl,
       });
       setDate(new Date().toISOString().split('T')[0]);
       setAmount('');
@@ -98,6 +174,10 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
       setPaymentMethod('cash');
       setTags('');
       setShowTags(false);
+      if (receiptPreviewUrl) URL.revokeObjectURL(receiptPreviewUrl);
+      setReceiptFile(null);
+      setReceiptPreviewUrl(null);
+      setExistingReceiptKey(undefined);
       setErrors({});
     } catch {
       setErrors({ submit: "Couldn't save that entry — try again." });
@@ -307,6 +387,78 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
               </button>
             )}
 
+            {/* Receipt photo — optional, uploaded straight to S3 via a
+                presigned URL (see services/cloudApi.ts); never through this
+                Lambda. */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-slate font-mono mb-1.5">
+                Receipt (optional)
+              </p>
+              {receiptPreviewUrl ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={receiptPreviewUrl}
+                    alt="Receipt preview"
+                    className="w-16 h-16 rounded-lg object-cover border border-line"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-slate">
+                      {isUploadingReceipt ? 'Uploading…' : 'Ready to attach'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveReceipt}
+                      className="text-xs text-ember hover:text-ember-strong text-left"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : existingReceiptKey ? (
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-16 h-16 rounded-lg border border-line bg-paper flex items-center justify-center text-2xl"
+                    aria-hidden="true"
+                  >
+                    🧾
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={handleViewExistingReceipt}
+                      className="text-xs text-pine hover:text-pine-strong text-left"
+                    >
+                      View receipt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemoveReceipt}
+                      className="text-xs text-ember hover:text-ember-strong text-left"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => receiptInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-dashed border-line text-sm text-slate hover:border-pine hover:text-pine-strong transition-colors"
+                >
+                  <span aria-hidden="true">📎</span>
+                  Attach a photo
+                </button>
+              )}
+              <input
+                ref={receiptInputRef}
+                type="file"
+                accept={ALLOWED_RECEIPT_TYPES.join(',')}
+                onChange={handleReceiptChange}
+                className="hidden"
+              />
+              {errors.receipt && <p className="text-ember text-xs mt-1.5">{errors.receipt}</p>}
+            </div>
+
             {errors.submit && (
               <p className="text-sm text-ember bg-ember/10 rounded-lg px-3.5 py-2.5">{errors.submit}</p>
             )}
@@ -318,7 +470,9 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
                 whileTap={{ scale: 0.98 }}
                 className="flex-1 px-6 py-3 bg-pine text-paper rounded-lg font-semibold disabled:opacity-60 transition-colors hover:bg-pine-strong"
               >
-                {isSubmitting ? 'Recording…' : expense ? 'Save changes' : 'Record entry'}
+                {isSubmitting
+                  ? (isUploadingReceipt ? 'Uploading receipt…' : 'Recording…')
+                  : expense ? 'Save changes' : 'Record entry'}
               </motion.button>
               <button
                 type="button"

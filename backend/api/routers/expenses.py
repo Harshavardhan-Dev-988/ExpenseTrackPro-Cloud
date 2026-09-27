@@ -54,7 +54,15 @@ def update_expense(expense_id: str, payload: ExpenseUpdate, user_id: str = Depen
     if not existing:
         raise HTTPException(status_code=404, detail="Expense not found")
 
-    updates = {k: v for k, v in payload.model_dump(mode="json").items() if v is not None}
+    # `exclude_unset`, not "drop None values" - a field the client sends as
+    # an explicit null (e.g. clearing an attached receipt) must actually
+    # clear it, while a field the client's request never mentions at all
+    # should be left untouched. Filtering out None instead would make
+    # "clear this field" silently do nothing, since it'd never distinguish
+    # "sent as null" from "not sent". The frontend's cloudApi.ts sends
+    # explicit null (not an omitted key) for anything it means to clear -
+    # see updateExpense there for the matching other half of this.
+    updates = payload.model_dump(mode="json", exclude_unset=True)
     merged = {**existing, **updates, "updatedAt": datetime.now(timezone.utc).isoformat()}
     db.put_item(merged)
     return _from_item(merged)
