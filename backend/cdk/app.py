@@ -24,7 +24,7 @@ stage = app.node.try_get_context("stage") or os.environ.get("APP_STAGE", "dev")
 
 env = cdk.Environment(
     account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
-    region=os.environ.get("CDK_DEFAULT_REGION", "ap-south-1"),
+    region=os.environ.get("CDK_DEFAULT_REGION", "ap-southeast-2"),
 )
 
 auth_stack = AuthStack(app, f"ExpenseTrack-Auth-{stage}", stage=stage, env=env)
