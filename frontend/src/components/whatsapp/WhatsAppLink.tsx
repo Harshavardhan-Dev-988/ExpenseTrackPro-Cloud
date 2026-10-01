@@ -148,13 +148,13 @@ export default function WhatsAppLink({ onClose }: WhatsAppLinkProps) {
             <div className="space-y-4">
               <ol className="space-y-3 text-sm text-ink list-decimal list-inside">
                 <li>
-                  On WhatsApp, send <span className="font-mono">join &lt;your sandbox word&gt;</span> to{' '}
-                  <span className="font-mono font-semibold">{linkCode.sandboxNumber}</span> — the
-                  sandbox word is shown on your Twilio console's WhatsApp Sandbox page (skip this
-                  step if you've already joined before).
+                  Make sure your WhatsApp is connected to our Twilio trial number — if you haven't
+                  already, scan the QR code or send the join message shown on the Twilio trial
+                  setup page (skip this if you've done it before).
                 </li>
                 <li>
-                  Then send this code to the same number:
+                  Then, from that same WhatsApp, send this code to{' '}
+                  <span className="font-mono font-semibold">{linkCode.sandboxNumber}</span>:
                   <div className="mt-2 flex items-center gap-2">
                     <span className="font-mono text-lg font-semibold tracking-wider bg-paper border border-line rounded-lg px-3 py-2">
                       LINK {linkCode.code}
@@ -162,6 +162,10 @@ export default function WhatsAppLink({ onClose }: WhatsAppLinkProps) {
                   </div>
                 </li>
               </ol>
+              <p className="text-xs text-slate">
+                Trial accounts can only message verified numbers (up to 5) — your own number is
+                verified automatically, so this works out of the box for you.
+              </p>
               <p className="text-xs text-slate">
                 This code expires in {Math.round(linkCode.expiresInSeconds / 60)} minutes. Once
                 you've sent it, this number is linked to your account — no need to reopen this

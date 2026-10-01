@@ -28,9 +28,13 @@ API_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "api")
 # deploy time, so the actual secret still never appears in the synthesized
 # template, only `{{resolve:secretsmanager:...}}`.
 TWILIO_AUTH_TOKEN_SECRET_NAME = "expense-track-pro/twilio-auth-token"
-# Twilio's shared WhatsApp Sandbox number - the same for every developer
-# account. Overridable once/if this moves to a dedicated business number.
-TWILIO_WHATSAPP_NUMBER = "+14155238886"
+# This account's Twilio trial WhatsApp sender number (Twilio's newer "Try
+# out WhatsApp" trial flow gives each account its own dedicated trial
+# number, rather than the older shared sandbox number) - shown to the user
+# in the app's "Link WhatsApp" UI as the number to text. Update this if the
+# project ever moves to a different sender (a new trial number, or a real
+# business-verified one).
+TWILIO_WHATSAPP_NUMBER = "+17372508034"
 
 
 class ApiStack(cdk.Stack):

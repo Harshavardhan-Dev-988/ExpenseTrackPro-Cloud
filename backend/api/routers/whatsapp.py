@@ -180,7 +180,7 @@ def create_link_code(user_id: str = Depends(get_user_id)):
     return LinkCodeResponse(
         code=code,
         expiresInSeconds=LINK_CODE_TTL_SECONDS,
-        sandboxNumber=os.environ.get("TWILIO_WHATSAPP_NUMBER", "+14155238886"),
+        sandboxNumber=os.environ.get("TWILIO_WHATSAPP_NUMBER", "+17372508034"),
     )
 
 
