@@ -1,26 +1,37 @@
 import { format } from 'date-fns';
 import type { Expense } from '../../types';
-import { CATEGORY_LABELS } from '../../utils/constants';
+import { CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
 import { getCategoryIcon } from '../../utils/helpers';
 import cloudApi from '../../services/cloudApi';
-
-async function openReceipt(key: string) {
-  try {
-    const viewUrl = await cloudApi.getReceiptViewUrl(key);
-    window.open(viewUrl, '_blank', 'noopener,noreferrer');
-  } catch {
-    alert("Couldn't open that receipt right now — try again in a moment.");
-  }
-}
+import { formatMoney } from '../../utils/helpers';
+import { useToast } from '../ui/toastContext';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onEdit: (expense: Expense) => void;
-  onDelete: (id: string) => void;
+  /** Asks for confirmation itself (see App's requestDeleteExpense). */
+  onDelete: (expense: Expense) => void;
   title?: string;
+  currency?: string;
 }
 
-export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recent Expenses' }: ExpenseListProps) {
+export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recent Expenses', currency = 'INR' }: ExpenseListProps) {
+  const toast = useToast();
+
+  const openReceipt = async (key: string) => {
+    // Open the tab synchronously (inside the click) so popup blockers allow
+    // it, then point it at the presigned URL once that comes back.
+    const tab = window.open('', '_blank');
+    try {
+      const viewUrl = await cloudApi.getReceiptViewUrl(key);
+      if (tab) tab.location.href = viewUrl;
+      else window.open(viewUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      tab?.close();
+      toast.error("Couldn't open that receipt", 'Try again in a moment.');
+    }
+  };
+
   if (expenses.length === 0) {
     return null;
   }
@@ -98,11 +109,11 @@ export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recen
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-ink">
                   {expense.category ? (CATEGORY_LABELS[expense.category] || expense.category) : 'Unknown'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate capitalize">
-                  {expense.paymentMethod?.replace('_', ' ') || 'N/A'}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate">
+                  {expense.paymentMethod ? PAYMENT_METHOD_LABELS[expense.paymentMethod] || expense.paymentMethod : '—'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-mono tabular font-semibold text-right text-ink">
-                  ₹{expense.amount.toFixed(2)}
+                  {formatMoney(expense.amount, currency)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
@@ -112,11 +123,7 @@ export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recen
                     Edit
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Are you sure you want to delete this expense?')) {
-                        onDelete(expense.id);
-                      }
-                    }}
+                    onClick={() => onDelete(expense)}
                     className="text-slate hover:text-ember-strong dark:hover:text-ember transition-colors"
                   >
                     Delete

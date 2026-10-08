@@ -14,56 +14,59 @@ const DEFAULT_SETTINGS: Settings = {
   locale: 'en-IN',
 };
 
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement;
+  
+  if (theme === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.toggle('dark', prefersDark);
+  } else {
+    root.classList.toggle('dark', theme === 'dark');
+  }
+}
+
 export const useSettings = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     try {
-      setLoading(true);
+      if (mode === 'initial') setLoading(true);
       setError(null);
       const savedSettings = await db.getSettings();
       setSettings(savedSettings || DEFAULT_SETTINGS);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load settings');
       console.error('Error loading settings:', err);
+      if (mode === 'refresh') throw err;
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
       setSettings(DEFAULT_SETTINGS);
     } finally {
-      setLoading(false);
+      if (mode === 'initial') setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSettings();
+    loadSettings('initial');
   }, [loadSettings]);
 
+  // Optimistic: the change (e.g. dark mode) applies instantly and is saved
+  // in the background; if the save fails it's rolled back and the error is
+  // thrown to the caller for a toast — it never takes the whole app down.
   const updateSettings = useCallback(async (newSettings: Partial<Settings>) => {
+    const previous = settings;
+    const updatedSettings = { ...settings, ...newSettings };
+    setSettings(updatedSettings);
+    if (newSettings.theme) applyTheme(newSettings.theme);
     try {
-      const updatedSettings = { ...settings, ...newSettings };
       await db.saveSettings(updatedSettings);
-      setSettings(updatedSettings);
-      
-      // Apply theme if changed
-      if (newSettings.theme) {
-        applyTheme(newSettings.theme);
-      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings');
+      setSettings(previous);
+      applyTheme(previous.theme);
       throw err;
     }
   }, [settings]);
 
-  const applyTheme = (theme: 'light' | 'dark' | 'system') => {
-    const root = document.documentElement;
-    
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-    } else {
-      root.classList.toggle('dark', theme === 'dark');
-    }
-  };
 
   // Apply theme on load
   useEffect(() => {
@@ -77,6 +80,6 @@ export const useSettings = () => {
     loading,
     error,
     updateSettings,
-    refreshSettings: loadSettings,
+    refreshSettings: () => loadSettings('refresh'),
   };
 };

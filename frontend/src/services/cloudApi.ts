@@ -62,19 +62,27 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** Runs `items` through `fn` with at most `limit` in flight at once. */
+/**
+ * Runs `items` through `fn` with at most `limit` in flight at once.
+ * `onProgress`, if given, is called after each item completes — used to
+ * show "120 of 500" on long imports, restores and wipes.
+ */
 export async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
-  fn: (item: T) => Promise<R>
+  fn: (item: T) => Promise<R>,
+  onProgress?: (done: number, total: number) => void
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
+  let done = 0;
 
   async function worker() {
     while (next < items.length) {
       const index = next++;
       results[index] = await fn(items[index]);
+      done++;
+      onProgress?.(done, items.length);
     }
   }
 
@@ -123,8 +131,8 @@ class CloudApiService {
     return created.id;
   }
 
-  async addExpenses(expenses: Expense[]): Promise<void> {
-    await mapWithConcurrency(expenses, 5, (expense) => this.addExpense(expense));
+  async addExpenses(expenses: Expense[], onProgress?: (done: number, total: number) => void): Promise<void> {
+    await mapWithConcurrency(expenses, 5, (expense) => this.addExpense(expense), onProgress);
   }
 
   async getAllExpenses(): Promise<Expense[]> {
@@ -150,13 +158,13 @@ class CloudApiService {
     await request(`/expenses/${id}`, { method: 'DELETE' });
   }
 
-  async deleteExpenses(ids: string[]): Promise<void> {
-    await mapWithConcurrency(ids, 5, (id) => this.deleteExpense(id));
+  async deleteExpenses(ids: string[], onProgress?: (done: number, total: number) => void): Promise<void> {
+    await mapWithConcurrency(ids, 5, (id) => this.deleteExpense(id), onProgress);
   }
 
-  async clearAllExpenses(): Promise<void> {
+  async clearAllExpenses(onProgress?: (done: number, total: number) => void): Promise<void> {
     const existing = await this.getAllExpenses();
-    await this.deleteExpenses(existing.map((expense) => expense.id));
+    await this.deleteExpenses(existing.map((expense) => expense.id), onProgress);
   }
 
   // ===== BUDGET OPERATIONS =====

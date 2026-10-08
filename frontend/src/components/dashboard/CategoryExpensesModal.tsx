@@ -17,7 +17,7 @@ interface CategoryExpensesModalProps {
   currency: string;
   onClose: () => void;
   onEdit: (expense: Expense) => void;
-  onDelete: (id: string) => void;
+  onDelete: (expense: Expense) => void;
   onAddNew: (category: CategoryType) => void;
 }
 
@@ -107,11 +107,9 @@ export default function CategoryExpensesModal({
 
   const pctOfTotal = periodTotal > 0 ? (stats.total / periodTotal) * 100 : 0;
 
-  const handleDelete = (expense: Expense) => {
-    if (confirm(`Delete "${expense.description || 'this entry'}" · ${formatMoney(expense.amount, currency)}?`)) {
-      onDelete(expense.id);
-    }
-  };
+  // App's requestDeleteExpense opens the confirmation dialog (it stacks
+  // above this modal) and handles the toast.
+  const handleDelete = (expense: Expense) => onDelete(expense);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

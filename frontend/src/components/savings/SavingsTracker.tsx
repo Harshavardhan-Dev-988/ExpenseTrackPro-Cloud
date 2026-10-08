@@ -5,6 +5,9 @@ import { SAVINGS_CATEGORY_LABELS } from '../../utils/constants';
 import type { SavingsEntry, SavingsGoal, SavingsCategory, Expense } from '../../types';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import StatTile from '../ui/StatTile';
+import Spinner from '../ui/Spinner';
+import { useToast, errorMessage } from '../ui/toastContext';
+import { useConfirm } from '../ui/confirmContext';
 
 interface SavingsTrackerProps {
   expenses: Expense[];
@@ -18,6 +21,10 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
   const [showAddSavings, setShowAddSavings] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [dateRange, setDateRange] = useState<'all' | 'month' | 'year'>('all');
+  const [loadingData, setLoadingData] = useState(true);
+  const [submitting, setSubmitting] = useState<null | 'savings' | 'goal'>(null);
+  const toast = useToast();
+  const confirm = useConfirm();
   
   // Form states
   const [savingsForm, setSavingsForm] = useState({
@@ -38,8 +45,8 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
   });
 
   useEffect(() => {
-    loadSavings();
-    loadGoals();
+    Promise.all([loadSavings(), loadGoals()]).finally(() => setLoadingData(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadSavings = async () => {
@@ -48,6 +55,7 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       setSavings(data);
     } catch (error) {
       console.error('Failed to load savings:', error);
+      toast.error("Couldn't load your savings", errorMessage(error));
     }
   };
 
@@ -57,6 +65,7 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       setSavingsGoals(data);
     } catch (error) {
       console.error('Failed to load savings goals:', error);
+      toast.error("Couldn't load your savings goals", errorMessage(error));
     }
   };
 
@@ -75,9 +84,11 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       updatedAt: new Date(),
     };
 
+    setSubmitting('savings');
     try {
       await db.addSavings(newSavings);
       await loadSavings();
+      toast.success('Savings recorded', `${formatCurrency(newSavings.amount)} · ${SAVINGS_CATEGORY_LABELS[newSavings.category] || newSavings.category}`);
       setShowAddSavings(false);
       setSavingsForm({
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -89,7 +100,9 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       });
     } catch (error) {
       console.error('Failed to add savings:', error);
-      alert('Failed to add savings');
+      toast.error("Couldn't add that savings entry", errorMessage(error));
+    } finally {
+      setSubmitting(null);
     }
   };
 
@@ -108,9 +121,11 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       createdAt: new Date(),
     };
 
+    setSubmitting('goal');
     try {
       await db.addSavingsGoal(newGoal);
       await loadGoals();
+      toast.success('Goal created', `${newGoal.name} · target ${formatCurrency(newGoal.targetAmount)}`);
       setShowAddGoal(false);
       setGoalForm({
         name: '',
@@ -121,30 +136,46 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
       });
     } catch (error) {
       console.error('Failed to add goal:', error);
-      alert('Failed to add savings goal');
+      toast.error("Couldn't create that goal", errorMessage(error));
+    } finally {
+      setSubmitting(null);
     }
   };
 
   const handleDeleteSavings = async (id: string) => {
-    if (confirm('Are you sure you want to delete this savings entry?')) {
-      try {
+    const entry = savings.find((s) => s.id === id);
+    const deleted = await confirm({
+      title: 'Delete this savings entry?',
+      message: "It'll be removed from your totals and goal progress. This can't be undone.",
+      details: entry ? (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="truncate text-ink">{entry.description || SAVINGS_CATEGORY_LABELS[entry.category] || entry.category}</span>
+          <span className="font-mono tabular font-semibold text-ink shrink-0">{formatCurrency(entry.amount)}</span>
+        </div>
+      ) : undefined,
+      confirmLabel: 'Delete entry',
+      busyLabel: 'Deleting…',
+      onConfirm: async () => {
         await db.deleteSavings(id);
         await loadSavings();
-      } catch (error) {
-        console.error('Failed to delete savings:', error);
-      }
-    }
+      },
+    });
+    if (deleted) toast.success('Savings entry deleted');
   };
 
   const handleDeleteGoal = async (id: string) => {
-    if (confirm('Are you sure you want to delete this savings goal?')) {
-      try {
+    const goal = savingsGoals.find((g) => g.id === id);
+    const deleted = await confirm({
+      title: goal ? `Delete the "${goal.name}" goal?` : 'Delete this savings goal?',
+      message: 'Your savings entries are kept — only the goal and its progress tracking are removed.',
+      confirmLabel: 'Delete goal',
+      busyLabel: 'Deleting…',
+      onConfirm: async () => {
         await db.deleteSavingsGoal(id);
         await loadGoals();
-      } catch (error) {
-        console.error('Failed to delete goal:', error);
-      }
-    }
+      },
+    });
+    if (deleted) toast.success('Goal deleted', goal?.name);
   };
 
   // Filter savings by date range
@@ -198,6 +229,15 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
 
   const ledgerInput = 'w-full px-3 py-2 border border-line rounded-lg bg-surface text-ink focus:outline-none focus:border-pine transition-colors';
   const ledgerLabel = 'block text-xs font-medium text-slate mb-1.5';
+
+  if (loadingData) {
+    return (
+      <div className="card-surface p-12 flex flex-col items-center justify-center text-center">
+        <Spinner size="lg" />
+        <p className="mt-4 text-sm text-slate font-mono">loading your savings…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -478,9 +518,16 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold hover:bg-pine-strong active:scale-[0.98] transition-all duration-200"
+                  disabled={submitting === 'savings'}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-wait"
                 >
-                  Add Savings
+                  {submitting === 'savings' ? (
+                    <>
+                      <Spinner size="sm" tone="paper" /> Saving…
+                    </>
+                  ) : (
+                    'Add savings'
+                  )}
                 </button>
                 <button
                   type="button"
@@ -563,9 +610,16 @@ export default function SavingsTracker({ expenses, currency = 'INR' }: SavingsTr
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold hover:bg-pine-strong active:scale-[0.98] transition-all duration-200"
+                  disabled={submitting === 'goal'}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-70 disabled:cursor-wait"
                 >
-                  Add Goal
+                  {submitting === 'goal' ? (
+                    <>
+                      <Spinner size="sm" tone="paper" /> Creating…
+                    </>
+                  ) : (
+                    'Add goal'
+                  )}
                 </button>
                 <button
                   type="button"

@@ -5,6 +5,8 @@ import { formatMoney } from '../../utils/helpers';
 import { cloudApi as db } from '../../services/cloudApi';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import BudgetAlerts from './BudgetAlerts';
+import { useToast, errorMessage } from '../ui/toastContext';
+import { useConfirm } from '../ui/confirmContext';
 
 interface BudgetsViewProps {
   currentSpending: Record<CategoryType, number>;
@@ -27,6 +29,8 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
   const [viewPeriod, setViewPeriod] = useState<'month' | 'year'>('month');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
+  const toast = useToast();
+  const confirm = useConfirm();
 
   useEffect(() => {
     loadBudgets();
@@ -35,12 +39,10 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
   const loadBudgets = async () => {
     try {
       const budgetsData = await db.getAllBudgets();
-      console.log('Loaded budgets:', budgetsData);
-      
+
       // Migrate legacy budgets without budgetType
       const migratedBudgets = budgetsData.map(budget => {
         if (!budget.budgetType) {
-          console.log('Migrating legacy budget:', budget.category);
           // If budget has monthlyLimit, it's a monthly budget
           // Otherwise default to monthly
           return {
@@ -55,7 +57,6 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
       // Save migrated budgets if any were updated
       const needsMigration = budgetsData.some(b => !b.budgetType);
       if (needsMigration) {
-        console.log('Saving migrated budgets...');
         for (const budget of migratedBudgets) {
           if (!budgetsData.find(b => b.category === budget.category && b.budgetType)) {
             await db.saveBudget(budget);
@@ -67,6 +68,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
       onBudgetsUpdate();
     } catch (error) {
       console.error('Failed to load budgets:', error);
+      toast.error("Couldn't load your budgets", errorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -88,33 +90,38 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
         isActive: true,
       };
 
-      console.log('Saving budget:', budget);
       await db.saveBudget(budget);
-      console.log('Budget saved successfully');
-      
       await loadBudgets();
-      const allBudgets = await db.getAllBudgets();
-      console.log('All budgets after save:', allBudgets);
-      
+      toast.success(
+        editingBudget ? 'Budget updated' : 'Budget saved',
+        `${CATEGORY_LABELS[budget.category] || budget.category} · ${formatMoney(
+          (budget.budgetType === 'yearly' ? budget.yearlyLimit : budget.monthlyLimit) || 0,
+          'INR'
+        )} ${budget.budgetType === 'yearly' ? 'a year' : 'a month'}`
+      );
       resetForm();
     } catch (error) {
       console.error('Failed to save budget:', error);
-      alert('Failed to save budget. Please try again.');
+      toast.error("Couldn't save that budget", errorMessage(error));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteBudget = async (category: CategoryType) => {
-    if (!confirm(`Delete budget for ${CATEGORY_LABELS[category] || category}?`)) return;
-
-    try {
-      await db.deleteBudget(category);
-      await loadBudgets();
-    } catch (error) {
-      console.error('Failed to delete budget:', error);
-      alert('Failed to delete budget. Please try again.');
-    }
+    const label = CATEGORY_LABELS[category] || category;
+    const deleted = await confirm({
+      title: `Delete the ${label} budget?`,
+      message: 'Your expenses stay as they are — only the spending limit and its alerts are removed.',
+      confirmLabel: 'Delete budget',
+      busyLabel: 'Deleting…',
+      tone: 'danger',
+      onConfirm: async () => {
+        await db.deleteBudget(category);
+        await loadBudgets();
+      },
+    });
+    if (deleted) toast.success('Budget deleted', label);
   };
 
   const handleEditBudget = (budget: CategoryBudget) => {

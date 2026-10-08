@@ -7,7 +7,18 @@ import {
   parseBackupFile,
   importBackup,
   type BackupData,
+  type ImportPhase,
 } from '../../services/backup';
+import { useToast, errorMessage } from '../ui/toastContext';
+import { useConfirm } from '../ui/confirmContext';
+import Spinner from '../ui/Spinner';
+
+const PHASE_LABEL: Record<ImportPhase, string> = {
+  clearing: 'Clearing current data',
+  expenses: 'Restoring expenses',
+  budgets: 'Restoring budgets',
+  settings: 'Restoring settings',
+};
 
 interface BackupRestoreProps {
   onClose: () => void;
@@ -15,78 +26,119 @@ interface BackupRestoreProps {
 }
 
 export default function BackupRestore({ onClose, onRestoreComplete }: BackupRestoreProps) {
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<null | 'exporting' | 'reading' | 'importing'>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [backupData, setBackupData] = useState<BackupData | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [progress, setProgress] = useState<{ phase: ImportPhase; done: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const loading = busy !== null;
 
   const handleExport = async () => {
-    setLoading(true);
+    setBusy('exporting');
     setError(null);
-    setSuccess(null);
-
     try {
       const backup = await exportBackup();
       downloadBackup(backup);
-      setSuccess(`Backup exported successfully! ${backup.metadata.expenseCount} expenses saved.`);
+      toast.success(
+        'Backup downloaded',
+        `${backup.metadata.expenseCount.toLocaleString('en-IN')} expenses and ${backup.metadata.budgetCount} budgets saved to a JSON file.`
+      );
     } catch (err) {
-      setError('Failed to export backup. Please try again.');
       console.error('Export error:', err);
+      setError(`Couldn't create the backup. ${errorMessage(err)}`);
+      toast.error('Backup failed', errorMessage(err));
     } finally {
-      setLoading(false);
+      setBusy(null);
     }
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
 
-    setLoading(true);
+    setBusy('reading');
     setError(null);
-    setSuccess(null);
     setBackupData(null);
+    setFileName(file.name);
 
     try {
       const backup = await parseBackupFile(file);
       setBackupData(backup);
-      setSuccess('Backup file loaded successfully! Review and import below.');
     } catch (err) {
-      setError((err as Error).message || 'Failed to parse backup file');
       console.error('Parse error:', err);
+      setError((err as Error).message || "That file doesn't look like an ExpenseTrack backup.");
+      setFileName(null);
     } finally {
-      setLoading(false);
+      setBusy(null);
+    }
+  };
+
+  const runImport = async (data: BackupData) => {
+    setBusy('importing');
+    setError(null);
+    setProgress(null);
+    const toastId = toast.loading('Restoring backup…', 'Starting');
+
+    try {
+      const result = await importBackup(data, importMode, (phase, done, total) => {
+        setProgress({ phase, done, total });
+        toast.update(toastId, {
+          description:
+            total > 0
+              ? `${PHASE_LABEL[phase]} · ${done.toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')}`
+              : PHASE_LABEL[phase],
+        });
+      });
+      toast.update(toastId, {
+        kind: 'success',
+        title: 'Backup restored',
+        description: `${result.imported.expenses.toLocaleString('en-IN')} expenses and ${result.imported.budgets} budgets ${
+          importMode === 'replace' ? 'restored' : 'added'
+        }.`,
+      });
+      setBackupData(null);
+      setFileName(null);
+      onRestoreComplete();
+      onClose();
+    } catch (err) {
+      console.error('Import error:', err);
+      const msg = errorMessage(err);
+      setError(`The restore didn't finish. ${msg}`);
+      toast.update(toastId, { kind: 'error', title: "Restore didn't finish", description: msg });
+      // Whatever did land is real data now — show it.
+      onRestoreComplete();
+    } finally {
+      setBusy(null);
+      setProgress(null);
     }
   };
 
   const handleImport = async () => {
     if (!backupData) return;
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const result = await importBackup(backupData, importMode);
-      setSuccess(
-        `Backup imported successfully! ${result.imported.expenses} expenses and ${result.imported.budgets} budgets restored.`
-      );
-      setBackupData(null);
-      
-      // Notify parent to refresh data
-      setTimeout(() => {
-        onRestoreComplete();
-        onClose();
-      }, 2000);
-    } catch (err) {
-      setError('Failed to import backup. Please try again.');
-      console.error('Import error:', err);
-    } finally {
-      setLoading(false);
+    if (importMode === 'replace') {
+      const ok = await confirm({
+        title: 'Replace all your data?',
+        message: (
+          <>
+            Every expense and budget currently in your ledger will be deleted, then replaced with the{' '}
+            {backupData.metadata.expenseCount.toLocaleString('en-IN')} expenses in this backup. This can't be undone.
+          </>
+        ),
+        confirmLabel: 'Replace everything',
+        tone: 'danger',
+      });
+      if (!ok) return;
     }
+    runImport(backupData);
   };
+
+  const pct = progress && progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -132,9 +184,26 @@ export default function BackupRestore({ onClose, onRestoreComplete }: BackupRest
             </div>
           )}
 
-          {success && (
-            <div className="bg-pine/10 border border-pine/30 rounded-lg p-4">
-              <p className="text-pine-strong dark:text-pine text-sm">{success}</p>
+          {busy === 'importing' && (
+            <div className="rounded-lg border border-pine/30 bg-pine/5 p-4" role="status">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-sm font-medium text-ink flex items-center gap-2">
+                  <Spinner size="sm" />
+                  {progress ? PHASE_LABEL[progress.phase] : 'Starting restore'}…
+                </p>
+                {progress && progress.total > 0 && (
+                  <span className="text-xs font-mono tabular text-slate">
+                    {progress.done.toLocaleString('en-IN')} / {progress.total.toLocaleString('en-IN')}
+                  </span>
+                )}
+              </div>
+              <div className="h-1.5 rounded-full bg-line overflow-hidden">
+                <div
+                  className={`h-full bg-pine rounded-full transition-[width] duration-300 ${pct === null ? 'w-1/3 animate-pulse' : ''}`}
+                  style={pct !== null ? { width: `${pct}%` } : undefined}
+                />
+              </div>
+              <p className="text-xs text-slate mt-2">You can close this window — progress also shows in the corner.</p>
             </div>
           )}
 
@@ -152,7 +221,13 @@ export default function BackupRestore({ onClose, onRestoreComplete }: BackupRest
               disabled={loading}
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              {loading ? 'Exporting...' : 'Download Backup'}
+              {busy === 'exporting' ? (
+                <>
+                  <Spinner size="sm" tone="paper" /> Preparing backup…
+                </>
+              ) : (
+                'Download backup'
+              )}
             </button>
           </div>
 
@@ -179,8 +254,19 @@ export default function BackupRestore({ onClose, onRestoreComplete }: BackupRest
               disabled={loading}
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-line bg-surface text-ink text-sm font-medium hover:border-pine hover:text-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Loading...' : 'Select Backup File'}
+              {busy === 'reading' ? (
+                <>
+                  <Spinner size="sm" /> Reading file…
+                </>
+              ) : backupData ? (
+                'Choose a different file'
+              ) : (
+                'Select backup file'
+              )}
             </button>
+            {fileName && backupData && (
+              <p className="mt-2 text-xs text-slate font-mono truncate">Loaded: {fileName}</p>
+            )}
 
             {/* Backup Preview */}
             {backupData && (
@@ -284,7 +370,16 @@ export default function BackupRestore({ onClose, onRestoreComplete }: BackupRest
                   disabled={loading}
                   className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                 >
-                  {loading ? 'Importing...' : 'Import Backup'}
+                  {busy === 'importing' ? (
+                    <>
+                      <Spinner size="sm" tone="paper" /> {progress?.phase === 'clearing' ? 'Clearing old data…' : 'Restoring…'}
+                      {pct !== null ? ` ${pct}%` : ''}
+                    </>
+                  ) : importMode === 'replace' ? (
+                    'Replace with this backup'
+                  ) : (
+                    'Merge this backup'
+                  )}
                 </button>
               </div>
             )}

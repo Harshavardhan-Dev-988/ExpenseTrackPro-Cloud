@@ -5,13 +5,19 @@ import './config/amplify'
 import App from './App.tsx'
 import AuthGate from './components/auth/AuthGate'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import { ToastProvider } from './components/ui/Toast'
+import { ConfirmProvider } from './components/ui/ConfirmDialog'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <AuthGate>
-        <App />
-      </AuthGate>
+      <ToastProvider>
+        <ConfirmProvider>
+          <AuthGate>
+            <App />
+          </AuthGate>
+        </ConfirmProvider>
+      </ToastProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

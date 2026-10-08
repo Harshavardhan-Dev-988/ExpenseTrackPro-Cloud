@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import type { CategoryType, PaymentMethod, Expense } from '../../types';
 import { CATEGORY_GROUPS, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
 import cloudApi from '../../services/cloudApi';
+import Spinner from '../ui/Spinner';
 
 // Kept in sync by hand with backend/api/routers/receipts.py's
 // ALLOWED_CONTENT_TYPES - the backend is the real gate (it rejects anything
@@ -468,10 +469,11 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
                 type="submit"
                 disabled={isSubmitting}
                 whileTap={{ scale: 0.98 }}
-                className="flex-1 px-6 py-3 bg-pine text-paper rounded-lg font-semibold disabled:opacity-60 transition-colors hover:bg-pine-strong"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-pine text-paper rounded-lg font-semibold disabled:opacity-70 disabled:cursor-wait transition-colors hover:bg-pine-strong"
               >
+                {isSubmitting && <Spinner size="sm" tone="paper" />}
                 {isSubmitting
-                  ? (isUploadingReceipt ? 'Uploading receipt…' : 'Recording…')
+                  ? (isUploadingReceipt ? 'Uploading receipt…' : expense ? 'Saving…' : 'Recording…')
                   : expense ? 'Save changes' : 'Record entry'}
               </motion.button>
               <button

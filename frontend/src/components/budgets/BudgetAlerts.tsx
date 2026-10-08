@@ -20,9 +20,6 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   const alerts = useMemo(() => {
-    console.log('BudgetAlerts: Checking alerts for date range:', dateRangeType, dateRangeLabel);
-    console.log('BudgetAlerts: Total budgets:', budgets.length);
-    console.log('BudgetAlerts: Total expenses provided:', expenses.length);
 
     // Calculate spending by category for provided expenses
     const spending = expenses.reduce((acc, expense) => {
@@ -30,7 +27,6 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
       return acc;
     }, {} as Record<string, number>);
 
-    console.log('BudgetAlerts: Spending by category:', spending);
 
     // Check each budget
     const allAlerts = budgets
@@ -70,7 +66,6 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
       .filter(alert => alert.status !== 'ok')
       .sort((a, b) => b.percentage - a.percentage);
 
-    console.log('BudgetAlerts: Alerts to display (non-ok):', filteredAlerts.length);
 
     return filteredAlerts;
   }, [budgets, expenses, dateRangeType, dateRangeLabel]);

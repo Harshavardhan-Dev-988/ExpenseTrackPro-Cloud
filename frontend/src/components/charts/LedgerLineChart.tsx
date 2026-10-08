@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -19,7 +19,12 @@ interface LedgerLineChartProps {
   ariaLabel: string;
   /** Optional caption rendered under the figure. */
   caption?: string;
+  /** What each point represents — drives the axis and hover labels. */
+  granularity?: 'day' | 'week' | 'month';
 }
+
+const AXIS_FORMAT = { day: 'MMM d', week: 'MMM d', month: "MMM ''yy" } as const;
+const HOVER_FORMAT = { day: 'EEE, MMM d', week: "'Week of' MMM d", month: 'MMMM yyyy' } as const;
 
 /**
  * The app's signature visual: spending drawn as a single hand-inked line on
@@ -40,6 +45,7 @@ export default function LedgerLineChart({
   accent = 'pine',
   ariaLabel,
   caption,
+  granularity = 'day',
 }: LedgerLineChartProps) {
   const filterId = useId();
   const clipId = useId();
@@ -48,7 +54,21 @@ export default function LedgerLineChart({
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
-  const width = 640; // viewBox width; scales responsively via CSS
+  // Draw at the container's real width (not a fixed viewBox that gets
+  // letterboxed on wide cards), so the line always spans the full card.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState(640);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w > 0) setMeasured(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const width = measured;
   const margin = compact
     ? { top: 6, right: 4, bottom: 6, left: 4 }
     : { top: 16, right: 16, bottom: 28, left: 8 };
@@ -125,7 +145,7 @@ export default function LedgerLineChart({
 
   return (
     <figure className="w-full">
-      <div className={compact ? '' : 'ledger-rules rounded-lg'} style={{ position: 'relative' }}>
+      <div ref={wrapRef} className={compact ? '' : 'ledger-rules rounded-lg'} style={{ position: 'relative' }}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
@@ -233,12 +253,21 @@ export default function LedgerLineChart({
 
             {!compact && xScale && (
               <g className="font-mono" fontSize={10} fill="rgb(var(--slate))">
-                <text x={0} y={innerH + 20} textAnchor="start">
-                  {format(data[0].date, 'MMM d')}
-                </text>
-                <text x={innerW} y={innerH + 20} textAnchor="end">
-                  {format(data[data.length - 1].date, 'MMM d')}
-                </text>
+                {(() => {
+                  // Up to ~6 evenly spaced labels, fewer on narrow screens.
+                  const slots = Math.max(2, Math.min(6, Math.floor(innerW / 110), points.length));
+                  const idxs = Array.from(new Set(Array.from({ length: slots }, (_, i) => Math.round((i * (points.length - 1)) / (slots - 1)))));
+                  return idxs.map((i, n) => (
+                    <text
+                      key={i}
+                      x={points[i].x}
+                      y={innerH + 20}
+                      textAnchor={n === 0 ? 'start' : n === idxs.length - 1 ? 'end' : 'middle'}
+                    >
+                      {format(points[i].d.date, AXIS_FORMAT[granularity])}
+                    </text>
+                  ));
+                })()}
               </g>
             )}
           </g>
@@ -259,7 +288,7 @@ export default function LedgerLineChart({
                 transform: `translateX(${hoveredPoint.x > innerW * 0.7 ? '-100%' : '0'})`,
               }}
             >
-              <div className="text-slate">{format(points[hover!.index].d.date, 'EEE, MMM d')}</div>
+              <div className="text-slate">{format(points[hover!.index].d.date, HOVER_FORMAT[granularity])}</div>
               <div className="font-semibold text-ink">{formatMoney(points[hover!.index].d.value, currency)}</div>
             </motion.div>
           )}

@@ -30,9 +30,6 @@ export default function CategoryBreakdown({ stats, total, currency, limit = 10, 
 
   return (
     <div>
-      {onSelectCategory && (
-        <p className="text-xs text-slate mb-3 -mt-1">Click a category to see every entry behind it</p>
-      )}
       <ul className="flex flex-col gap-3.5">
       {ranked.map((stat, index) => {
         const pct = total > 0 ? (stat.total / total) * 100 : 0;

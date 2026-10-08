@@ -116,14 +116,19 @@ export function validateBackup(data: any): { valid: boolean; error?: string } {
  * @param backup Validated backup data
  * @param mode 'merge' to keep existing data, 'replace' to clear and import
  */
+export type ImportPhase = 'clearing' | 'expenses' | 'budgets' | 'settings';
+export type ImportProgress = (phase: ImportPhase, done: number, total: number) => void;
+
 export async function importBackup(
   backup: BackupData,
-  mode: 'merge' | 'replace'
+  mode: 'merge' | 'replace',
+  onProgress?: ImportProgress
 ): Promise<{ success: boolean; imported: { expenses: number; budgets: number } }> {
   try {
     if (mode === 'replace') {
       // Clear existing data
-      await db.clearAllExpenses();
+      onProgress?.('clearing', 0, 0);
+      await db.clearAllExpenses((done, total) => onProgress?.('clearing', done, total));
       await db.clearAllBudgets();
     }
 
@@ -146,7 +151,8 @@ export async function importBackup(
     // Import expenses
     let importedExpenses = 0;
     if (transformedExpenses.length > 0) {
-      await db.addExpenses(transformedExpenses);
+      onProgress?.('expenses', 0, transformedExpenses.length);
+      await db.addExpenses(transformedExpenses, (done, total) => onProgress?.('expenses', done, total));
       importedExpenses = transformedExpenses.length;
     }
 
@@ -155,10 +161,12 @@ export async function importBackup(
     for (const budget of backup.data.budgets) {
       await db.saveBudget(budget);
       importedBudgets++;
+      onProgress?.('budgets', importedBudgets, backup.data.budgets.length);
     }
 
     // Import settings
     if (backup.data.settings) {
+      onProgress?.('settings', 0, 1);
       await db.saveSettings(backup.data.settings);
     }
 

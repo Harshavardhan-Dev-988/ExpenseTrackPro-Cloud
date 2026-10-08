@@ -4,6 +4,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import type { CategoryType, PaymentMethod } from '../../types';
 import { CATEGORY_LABELS } from '../../utils/constants';
+import Spinner from '../ui/Spinner';
 interface BulkUploadProps {
   onUpload: (expenses: Array<{
     date: Date;
@@ -12,7 +13,7 @@ interface BulkUploadProps {
     description: string;
     paymentMethod?: PaymentMethod;
     tags?: string[];
-  }>) => Promise<void>;
+  }>, onProgress?: (done: number, total: number) => void) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -162,11 +164,13 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
         throw new Error('No valid expenses found in file');
       }
 
-      await onUpload(validExpenses);
+      setProgress({ done: 0, total: validExpenses.length });
+      await onUpload(validExpenses, (done, total) => setProgress({ done, total }));
     } catch (err: any) {
       setError(err.message || 'Failed to upload expenses');
     } finally {
       setIsProcessing(false);
+      setProgress(null);
     }
   };
 
@@ -266,7 +270,14 @@ export default function BulkUpload({ onUpload, onCancel }: BulkUploadProps) {
               disabled={isProcessing || preview.length === 0}
               className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              {isProcessing ? 'Processing...' : 'Upload Expenses'}
+              {isProcessing ? (
+                <>
+                  <Spinner size="sm" tone="paper" />
+                  {progress ? `Importing ${progress.done} of ${progress.total}…` : 'Reading file…'}
+                </>
+              ) : (
+                'Upload expenses'
+              )}
             </button>
             <button
               onClick={onCancel}
