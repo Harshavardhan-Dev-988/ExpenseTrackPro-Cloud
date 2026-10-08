@@ -90,12 +90,13 @@ class AuthStack(cdk.Stack):
             user_pool=self.user_pool,
             client_id=FACEBOOK_APP_ID,
             client_secret=cdk.SecretValue.secrets_manager(FACEBOOK_APP_SECRET_NAME).unsafe_unwrap(),
-            # Cognito falls back to Facebook Graph API v2.12 if this is left
-            # unset - a version Facebook deprecated back in 2020. Calling the
-            # OAuth dialog with that dead version is what produced the
-            # "Invalid Scopes: email" error on first deploy; pinning a
-            # current, long-supported version fixes it.
-            api_version="v23.0",
+            # Pin an explicit Graph API version rather than letting Cognito
+            # fall back to its old v2.12 default (deprecated by Facebook in
+            # 2020). Cognito validates this against its own allowlist, which
+            # lags Facebook's real versions: v23.0 and v25.0 were both
+            # rejected at deploy time ("not a valid value for apiVersion"),
+            # v17.0 is accepted and is what's deployed.
+            api_version="v17.0",
             scopes=["public_profile", "email"],
             attribute_mapping=cognito.AttributeMapping(
                 email=cognito.ProviderAttribute.FACEBOOK_EMAIL,
