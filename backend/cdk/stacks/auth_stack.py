@@ -53,6 +53,27 @@ class AuthStack(cdk.Stack):
                 require_symbols=False,
             ),
             account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
+            # Sign-up now happens in the app itself (components/auth/AuthCard),
+            # which asks for the 6-digit code from this email - so it should
+            # look like it came from us, not a bare "Your verification code".
+            user_verification=cognito.UserVerificationConfig(
+                email_style=cognito.VerificationEmailStyle.CODE,
+                email_subject="Your ExpenseTrack Pro verification code",
+                email_body=(
+                    '<div style="font-family:Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;'
+                    'padding:32px 28px;background:#FBFCFA;border:1px solid #D9DDD6;border-radius:16px;color:#17211D">'
+                    '<p style="margin:0 0 4px;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#2F4D3F">'
+                    "ExpenseTrack Pro</p>"
+                    '<h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:24px">Your verification code</h1>'
+                    '<p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#5C6B64">'
+                    "Enter this code in the app to finish setting up your ledger (or to reset your password).</p>"
+                    '<p style="margin:0 0 20px;font-family:Menlo,Consolas,monospace;font-size:32px;letter-spacing:8px;'
+                    'font-weight:bold;color:#2F4D3F;background:#EEF1EE;border-radius:12px;padding:14px 0;text-align:center">'
+                    "{####}</p>"
+                    '<p style="margin:0;font-size:13px;color:#8A958F">If you didn\'t ask for this, you can ignore this email.</p>'
+                    "</div>"
+                ),
+            ),
             removal_policy=removal_policy,
         )
 

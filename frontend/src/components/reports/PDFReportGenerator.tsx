@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import { generateExpenseReport, type ReportSections } from '../../services/pdfGenerator';
+import { exportDashboardSnapshot, prepareSnapshotFonts, type SnapshotLayout } from '../../services/dashboardSnapshot';
 import type { Expense, CategoryBudget } from '../../types';
 import { inPeriod, resolvePeriod, type ResolvedPeriod } from '../../utils/period';
 import { useToast, errorMessage } from '../ui/toastContext';
@@ -12,8 +15,12 @@ interface PDFReportGeneratorProps {
   currency: string;
   /** The dashboard's currently selected period, offered as the default scope. */
   dashboardPeriod: ResolvedPeriod;
+  /** Switches to the dashboard tab (needed for a snapshot from elsewhere). */
+  onShowDashboard: () => void;
   onClose: () => void;
 }
+
+type Kind = 'snapshot' | 'report';
 
 const SECTION_OPTIONS: { key: keyof ReportSections; label: string; hint: string }[] = [
   { key: 'summary', label: 'Summary', hint: 'Totals, daily average, change vs the previous period' },
@@ -25,8 +32,39 @@ const SECTION_OPTIONS: { key: keyof ReportSections; label: string; hint: string 
   { key: 'transactions', label: 'Every transaction', hint: 'Full list — adds pages for long periods' },
 ];
 
-export default function PDFReportGenerator({ expenses, budgets, currency, dashboardPeriod, onClose }: PDFReportGeneratorProps) {
+const STAGE_TEXT = {
+  preparing: 'Preparing the dashboard…',
+  rendering: 'Capturing the dashboard…',
+  paginating: 'Laying out pages…',
+} as const;
+
+const findDashboard = () => document.getElementById('dashboard-snapshot');
+
+async function waitForDashboard(timeoutMs = 3000): Promise<HTMLElement | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const el = findDashboard();
+    if (el) {
+      // Give the entry animations time to finish before capturing.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      return el;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return null;
+}
+
+export default function PDFReportGenerator({
+  expenses,
+  budgets,
+  currency,
+  dashboardPeriod,
+  onShowDashboard,
+  onClose,
+}: PDFReportGeneratorProps) {
   const toast = useToast();
+  const [kind, setKind] = useState<Kind>('snapshot');
+  const [layout, setLayout] = useState<SnapshotLayout>('pages');
   const [scope, setScope] = useState<'dashboard' | 'all'>(dashboardPeriod.type === 'all' ? 'all' : 'dashboard');
   const [sections, setSections] = useState<ReportSections>({
     summary: true,
@@ -40,8 +78,11 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Warm the font cache so the snapshot doesn't wait on it.
+  useEffect(() => prepareSnapshotFonts(), []);
+
   const allTime = useMemo(() => resolvePeriod({ type: 'all' }, expenses), [expenses]);
-  const period = scope === 'all' ? allTime : dashboardPeriod;
+  const period = kind === 'snapshot' || scope === 'dashboard' ? dashboardPeriod : allTime;
   const entryCount = useMemo(() => inPeriod(expenses, period.start, period.end).length, [expenses, period]);
   const dashboardCount = useMemo(
     () => inPeriod(expenses, dashboardPeriod.start, dashboardPeriod.end).length,
@@ -49,10 +90,36 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
   );
   const anySection = Object.values(sections).some(Boolean);
   const transactionPages = sections.transactions ? Math.ceil(entryCount / 38) : 0;
+  const slug = period.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  const handleGenerate = async () => {
-    setGenerating(true);
-    setError(null);
+  const generateSnapshot = async () => {
+    const id = toast.loading('Creating dashboard PDF…', STAGE_TEXT.preparing);
+    try {
+      let el = findDashboard();
+      if (!el) {
+        onShowDashboard();
+        el = await waitForDashboard();
+      }
+      if (!el) throw new Error("Couldn't find the dashboard to capture — open it and try again.");
+      const fileName = `dashboard-${slug || 'snapshot'}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      await exportDashboardSnapshot(el, {
+        fileName,
+        layout,
+        footerLabel: `ExpenseTrack Pro - Dashboard - ${dashboardPeriod.label}`,
+        onStage: (stage) => toast.update(id, { description: STAGE_TEXT[stage] }),
+      });
+      toast.update(id, { kind: 'success', title: 'Dashboard PDF downloaded', description: fileName });
+      onClose();
+    } catch (err) {
+      console.error('Snapshot PDF error:', err);
+      const msg = errorMessage(err, "Couldn't capture the dashboard.");
+      setError(msg);
+      toast.update(id, { kind: 'error', title: "Couldn't create the PDF", description: msg });
+      setGenerating(false);
+    }
+  };
+
+  const generateReport = async () => {
     const id = toast.loading('Building your PDF report…', `${period.label} · ${entryCount.toLocaleString('en-IN')} entries`);
     // Let the spinner paint before the (synchronous) PDF build runs.
     await new Promise((resolve) => setTimeout(resolve, 40));
@@ -67,6 +134,13 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
       toast.update(id, { kind: 'error', title: "Couldn't create the PDF", description: msg });
       setGenerating(false);
     }
+  };
+
+  const handleGenerate = () => {
+    setGenerating(true);
+    setError(null);
+    if (kind === 'snapshot') generateSnapshot();
+    else generateReport();
   };
 
   return (
@@ -89,9 +163,9 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
         <div className="px-6 pt-5 pb-4 border-b border-line flex items-start justify-between gap-4">
           <div>
             <h2 id="pdf-title" className="font-display text-xl font-semibold text-ink">
-              Download PDF report
+              Download as PDF
             </h2>
-            <p className="text-sm text-slate mt-0.5">A printable summary with charts, categories and budgets.</p>
+            <p className="text-sm text-slate mt-0.5">A picture-perfect copy of your dashboard, or a printable report.</p>
           </div>
           <button
             onClick={onClose}
@@ -113,53 +187,102 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
           )}
 
           <fieldset>
-            <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">Period</legend>
+            <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">What to export</legend>
             <div className="grid sm:grid-cols-2 gap-2">
-              {dashboardPeriod.type !== 'all' && (
-                <ScopeOption
-                  checked={scope === 'dashboard'}
-                  onChange={() => setScope('dashboard')}
-                  title={dashboardPeriod.label}
-                  hint={`As on the dashboard · ${dashboardCount.toLocaleString('en-IN')} entries`}
-                />
-              )}
-              <ScopeOption
-                checked={scope === 'all'}
-                onChange={() => setScope('all')}
-                title="All time"
-                hint={`${expenses.length.toLocaleString('en-IN')} entries`}
+              <ChoiceCard
+                checked={kind === 'snapshot'}
+                onChange={() => setKind('snapshot')}
+                title="Dashboard snapshot"
+                hint={`Exactly what's on screen · ${dashboardPeriod.label}`}
+                icon={
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm4 11l3-4 2 2 3-5" />
+                }
+              />
+              <ChoiceCard
+                checked={kind === 'report'}
+                onChange={() => setKind('report')}
+                title="Detailed report"
+                hint="Tables & charts laid out for printing"
+                icon={
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                }
               />
             </div>
           </fieldset>
 
-          <fieldset>
-            <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">Include</legend>
-            <div className="divide-y divide-line border border-line rounded-lg overflow-hidden">
-              {SECTION_OPTIONS.map((opt) => (
-                <label key={opt.key} className="flex items-start gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-paper transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={sections[opt.key]}
-                    onChange={() => setSections((s) => ({ ...s, [opt.key]: !s[opt.key] }))}
-                    className="mt-0.5 w-4 h-4 accent-pine"
+          {kind === 'snapshot' ? (
+            <fieldset>
+              <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">Layout</legend>
+              <div className="grid sm:grid-cols-2 gap-2">
+                <ChoiceCard
+                  checked={layout === 'pages'}
+                  onChange={() => setLayout('pages')}
+                  title="A4 pages"
+                  hint="Split between cards — good for printing"
+                />
+                <ChoiceCard
+                  checked={layout === 'single'}
+                  onChange={() => setLayout('single')}
+                  title="One long page"
+                  hint="A single continuous image of the dashboard"
+                />
+              </div>
+              <p className="text-xs text-slate mt-3">
+                Captured in your current theme and screen width. To change the period, pick it on the dashboard first.
+              </p>
+            </fieldset>
+          ) : (
+            <>
+              <fieldset>
+                <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">Period</legend>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {dashboardPeriod.type !== 'all' && (
+                    <ChoiceCard
+                      checked={scope === 'dashboard'}
+                      onChange={() => setScope('dashboard')}
+                      title={dashboardPeriod.label}
+                      hint={`As on the dashboard · ${dashboardCount.toLocaleString('en-IN')} entries`}
+                    />
+                  )}
+                  <ChoiceCard
+                    checked={scope === 'all'}
+                    onChange={() => setScope('all')}
+                    title="All time"
+                    hint={`${expenses.length.toLocaleString('en-IN')} entries`}
                   />
-                  <span className="flex-1">
-                    <span className="block text-sm font-medium text-ink">{opt.label}</span>
-                    <span className="block text-xs text-slate">
-                      {opt.key === 'transactions' && sections.transactions && entryCount > 0
-                        ? `About ${transactionPages} extra page${transactionPages === 1 ? '' : 's'} for ${entryCount.toLocaleString('en-IN')} entries`
-                        : opt.hint}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className="text-xs font-mono uppercase tracking-wider text-slate mb-2">Include</legend>
+                <div className="divide-y divide-line border border-line rounded-lg overflow-hidden">
+                  {SECTION_OPTIONS.map((opt) => (
+                    <label key={opt.key} className="flex items-start gap-3 px-3.5 py-2.5 cursor-pointer hover:bg-paper transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={sections[opt.key]}
+                        onChange={() => setSections((s) => ({ ...s, [opt.key]: !s[opt.key] }))}
+                        className="mt-0.5 w-4 h-4 accent-pine"
+                      />
+                      <span className="flex-1">
+                        <span className="block text-sm font-medium text-ink">{opt.label}</span>
+                        <span className="block text-xs text-slate">
+                          {opt.key === 'transactions' && sections.transactions && entryCount > 0
+                            ? `About ${transactionPages} extra page${transactionPages === 1 ? '' : 's'} for ${entryCount.toLocaleString('en-IN')} entries`
+                            : opt.hint}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-line bg-paper/60 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 rounded-b-ledger">
           <p className="text-xs text-slate font-mono">
-            {entryCount === 0 ? 'No entries in this period' : `${entryCount.toLocaleString('en-IN')} entries · A4`}
+            {entryCount === 0 ? 'No entries in this period' : `${entryCount.toLocaleString('en-IN')} entries · ${period.label}`}
           </p>
           <div className="flex gap-2">
             <button
@@ -171,12 +294,12 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
             </button>
             <button
               onClick={handleGenerate}
-              disabled={generating || !anySection || expenses.length === 0}
+              disabled={generating || (kind === 'report' && !anySection) || expenses.length === 0}
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {generating ? (
                 <>
-                  <Spinner size="sm" tone="paper" /> Building PDF…
+                  <Spinner size="sm" tone="paper" /> {kind === 'snapshot' ? 'Capturing…' : 'Building PDF…'}
                 </>
               ) : (
                 <>
@@ -194,7 +317,19 @@ export default function PDFReportGenerator({ expenses, budgets, currency, dashbo
   );
 }
 
-function ScopeOption({ checked, onChange, title, hint }: { checked: boolean; onChange: () => void; title: string; hint: string }) {
+function ChoiceCard({
+  checked,
+  onChange,
+  title,
+  hint,
+  icon,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  title: string;
+  hint: string;
+  icon?: ReactNode;
+}) {
   return (
     <label
       className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -202,9 +337,16 @@ function ScopeOption({ checked, onChange, title, hint }: { checked: boolean; onC
       }`}
     >
       <input type="radio" checked={checked} onChange={onChange} className="mt-0.5 accent-pine" />
-      <span>
-        <span className="block text-sm font-medium text-ink">{title}</span>
-        <span className="block text-xs text-slate">{hint}</span>
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+          {icon && (
+            <svg className="w-4 h-4 text-slate" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              {icon}
+            </svg>
+          )}
+          {title}
+        </span>
+        <span className="block text-xs text-slate mt-0.5">{hint}</span>
       </span>
     </label>
   );

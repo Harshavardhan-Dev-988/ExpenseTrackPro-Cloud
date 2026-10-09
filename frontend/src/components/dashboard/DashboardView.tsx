@@ -100,7 +100,7 @@ function SectionCard({
   delay?: number;
 }) {
   return (
-    <motion.section className={`card-surface p-5 sm:p-6 ${className}`} {...reveal(delay)}>
+    <motion.section data-snapshot-block className={`card-surface p-5 sm:p-6 ${className}`} {...reveal(delay)}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink leading-tight">{title}</h2>
@@ -155,7 +155,7 @@ function PeriodToolbar({
     'h-9 w-9 inline-flex items-center justify-center rounded-lg border border-line bg-surface text-slate hover:text-ink hover:border-pine transition-colors disabled:opacity-40 disabled:pointer-events-none';
 
   return (
-    <div className="card-surface p-2 sm:p-2.5 mb-5 flex flex-col lg:flex-row lg:items-center gap-2.5">
+    <div data-snapshot-exclude className="card-surface p-2 sm:p-2.5 mb-5 flex flex-col lg:flex-row lg:items-center gap-2.5">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 min-w-0">
         <div className="flex gap-1 bg-paper rounded-lg p-1 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Period">
           {RANGE_TABS.map(({ type, label }) => {
@@ -307,6 +307,7 @@ function BudgetStrip({
   return (
     <motion.div
       {...reveal()}
+      data-snapshot-block
       className={`card-surface mb-5 p-3 sm:p-3.5 border-l-4 ${over ? 'border-l-ember' : 'border-l-brass'} flex flex-col sm:flex-row sm:items-center gap-3`}
       role="status"
     >
@@ -345,7 +346,7 @@ function BudgetStrip({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div data-snapshot-exclude className="flex items-center gap-1.5 shrink-0">
         <button
           onClick={onManage}
           className="px-3 py-1.5 text-xs rounded-lg font-medium border border-line bg-surface text-ink hover:border-pine hover:text-pine-strong transition-colors"
@@ -447,7 +448,27 @@ export default function DashboardView({
   const granularityLabel = series.granularity === 'day' ? 'Daily' : series.granularity === 'week' ? 'Weekly' : 'Monthly';
 
   return (
-    <>
+    <div id="dashboard-snapshot">
+      {/* Only rendered into the PDF snapshot (see services/dashboardSnapshot). */}
+      <div data-snapshot-only data-snapshot-block className="mb-5">
+        <div className="flex items-end justify-between gap-4 pb-4 border-b border-line">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-lg bg-pine flex items-center justify-center">
+              <span className="text-lg font-display font-semibold text-paper">₹</span>
+            </span>
+            <div>
+              <p className="font-display text-xl font-semibold text-ink leading-tight">ExpenseTrack Pro</p>
+              <p className="text-xs font-mono uppercase tracking-wide text-slate">Dashboard · {period.label}</p>
+            </div>
+          </div>
+          <p className="text-xs font-mono text-slate text-right">
+            {expenses.length.toLocaleString('en-IN')} entries
+            <br />
+            Exported {format(new Date(), 'd MMM yyyy, h:mm a')}
+          </p>
+        </div>
+      </div>
+
       <PeriodToolbar
         range={range}
         onRangeChange={onRangeChange}
@@ -492,7 +513,7 @@ export default function DashboardView({
       ) : (
         <>
           {/* Hero: total, change, key rates, trend */}
-          <motion.section className="card-surface relative overflow-hidden p-5 sm:p-7 mb-5" {...reveal()}>
+          <motion.section data-snapshot-block className="card-surface relative overflow-hidden p-5 sm:p-7 mb-5" {...reveal()}>
             <div className="aura aura-pine" aria-hidden="true" />
             <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-5 mb-4">
               <div className="min-w-0">
@@ -541,12 +562,14 @@ export default function DashboardView({
                 granularity={series.granularity}
                 ariaLabel={`${granularityLabel} spending for ${period.label}`}
               />
-              <p className="mt-1 text-[11px] font-mono text-slate">{granularityLabel} totals · hover for detail</p>
+              <p className="mt-1 text-[11px] font-mono text-slate">
+                {granularityLabel} totals<span data-snapshot-exclude> · hover for detail</span>
+              </p>
             </div>
           </motion.section>
 
           {/* Key facts */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+          <div data-snapshot-block className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
             {facts.top && (
               <StatTile
                 icon={ICON.tag}
@@ -604,7 +627,7 @@ export default function DashboardView({
           </div>
 
           {/* Where it went + Recent activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 mb-5">
+          <div data-snapshot-block className="grid grid-cols-1 lg:grid-cols-5 gap-5 mb-5">
             <SectionCard
               className="lg:col-span-2"
               title="Where it went"
@@ -624,7 +647,7 @@ export default function DashboardView({
               subtitle="Latest entries in this period · tap to edit"
               delay={0.1}
               action={
-                <button onClick={onAddExpense} className="text-xs font-medium text-pine hover:text-pine-strong transition-colors whitespace-nowrap">
+                <button data-snapshot-exclude onClick={onAddExpense} className="text-xs font-medium text-pine hover:text-pine-strong transition-colors whitespace-nowrap">
                   + Add
                 </button>
               }
@@ -634,25 +657,25 @@ export default function DashboardView({
           </div>
 
           {/* Supporting charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5 lg:items-stretch">
-            <motion.div className="h-full" {...reveal(0.15)}>
+          <div data-snapshot-block className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5 lg:items-stretch">
+            <motion.div data-snapshot-block className="h-full" {...reveal(0.15)}>
               <CategoryPieChart categoryStats={categoryStats.filter((s) => s.total > 0)} currency={currency} compact />
             </motion.div>
             <div className="h-full flex flex-col gap-5">
-              <motion.div {...reveal(0.2)}>
+              <motion.div data-snapshot-block {...reveal(0.2)}>
                 <PaymentMethodChart expenses={expenses} currency={currency} compact />
               </motion.div>
-              <motion.div className="flex-1 min-h-[160px]" {...reveal(0.25)}>
+              <motion.div data-snapshot-block className="flex-1 min-h-[160px]" {...reveal(0.25)}>
                 <WeekdaySpendingChart expenses={expenses} currency={currency} compact fillHeight />
               </motion.div>
             </div>
           </div>
 
-          <motion.div className="mb-8" {...reveal(0.3)}>
+          <motion.div className="mb-8" data-snapshot-block {...reveal(0.3)}>
             <DailyExpensesChart expenses={allExpenses} />
           </motion.div>
         </>
       )}
-    </>
+    </div>
   );
 }

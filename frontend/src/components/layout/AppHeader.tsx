@@ -175,8 +175,8 @@ function MenuContent({
             className="overflow-hidden"
           >
             <div className="ml-5 pl-2 border-l border-line">
-              <MenuItem iconNode={ICONS.pdf} hint="Charts, categories, budgets" onSelect={run(onPdfReport)}>
-                PDF report
+              <MenuItem iconNode={ICONS.pdf} hint="Dashboard snapshot or full report" onSelect={run(onPdfReport)}>
+                PDF
               </MenuItem>
               <MenuItem iconNode={ICONS.sheet} onSelect={run(() => onExport('excel'))}>
                 Excel (.xlsx)

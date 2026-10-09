@@ -490,6 +490,7 @@ function App() {
           budgets={budgets}
           currency={currency}
           dashboardPeriod={dashboardPeriod}
+          onShowDashboard={() => setCurrentView('dashboard')}
           onClose={() => setShowPDFGenerator(false)}
         />
       )}

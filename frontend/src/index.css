@@ -158,6 +158,12 @@
   }
 }
 
+/* Dashboard PDF snapshot (services/dashboardSnapshot.ts): a title strip that
+   only exists in the export, and controls that don't belong in it. */
+[data-snapshot-only] { display: none; }
+.snapshotting [data-snapshot-only] { display: block; }
+.snapshotting [data-snapshot-exclude] { display: none !important; }
+
 /* Indeterminate top progress bar (App's "refreshing" state). */
 .loading-bar {
   animation: loadingBar 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;

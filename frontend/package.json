@@ -23,6 +23,7 @@
     "html2canvas": "^1.4.1",
     "idb": "^8.0.3",
     "jspdf": "^4.2.1",
+    "modern-screenshot": "^4.7.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

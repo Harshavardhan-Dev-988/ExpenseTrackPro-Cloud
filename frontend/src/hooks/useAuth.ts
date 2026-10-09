@@ -1,29 +1,27 @@
 /**
- * Auth state for the app, backed by Cognito's Hosted UI (managed login) via
- * Amplify's Auth client. There's no in-app login form — `signIn()` below
- * just redirects to the Hosted UI, and Cognito redirects back to us once
- * the user's done (see `redirectSignIn` in `config/amplify.ts`).
+ * Auth state for the app, backed by Cognito via Amplify's Auth client.
+ *
+ * Signing in happens either in-app (components/auth/AuthCard — email and
+ * password over SRP, sign-up, verification and password reset) or by a
+ * redirect straight to Google / Facebook (`signInWithRedirect({ provider })`),
+ * which Cognito brokers and then sends back here (see `redirectSignIn` in
+ * `config/amplify.ts`).
  *
  * `getCurrentUser()` throws when nobody's signed in, so "check auth on load"
- * is a try/catch, not a truthy check. The `Hub` listener picks up the
- * moment the Hosted UI redirect completes (or fails) so we don't have to
- * poll — `signInWithRedirect` resolves before the actual redirect/callback
- * round-trip finishes, so relying on it alone would miss the real state
- * change.
+ * is a try/catch, not a truthy check. The `Hub` listener picks up both an
+ * in-app sign-in and the moment a redirect completes (or fails), so we don't
+ * have to poll.
  */
 import { useCallback, useEffect, useState } from 'react';
-import {
-  getCurrentUser,
-  signInWithRedirect,
-  signOut as amplifySignOut,
-  type AuthUser,
-} from 'aws-amplify/auth';
+import { getCurrentUser, signOut as amplifySignOut, type AuthUser } from 'aws-amplify/auth';
 import { Hub } from 'aws-amplify/utils';
 
 interface AuthState {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** Set when a Google/Facebook redirect comes back with an error. */
+  authError: string | null;
 }
 
 export function useAuth() {
@@ -31,14 +29,15 @@ export function useAuth() {
     user: null,
     isLoading: true,
     isAuthenticated: false,
+    authError: null,
   });
 
   const refresh = useCallback(async () => {
     try {
       const user = await getCurrentUser();
-      setState({ user, isLoading: false, isAuthenticated: true });
+      setState({ user, isLoading: false, isAuthenticated: true, authError: null });
     } catch {
-      setState({ user: null, isLoading: false, isAuthenticated: false });
+      setState((s) => ({ ...s, user: null, isLoading: false, isAuthenticated: false }));
     }
   }, []);
 
@@ -51,9 +50,21 @@ export function useAuth() {
         case 'signedIn':
           refresh();
           break;
-        case 'signInWithRedirect_failure':
+        case 'signInWithRedirect_failure': {
+          const data = (payload as { data?: { error?: { message?: string } } }).data;
+          const message = data?.error?.message;
+          setState({
+            user: null,
+            isLoading: false,
+            isAuthenticated: false,
+            authError: message
+              ? `Sign-in with that account didn't complete: ${message}`
+              : "Sign-in with that account didn't complete — please try again.",
+          });
+          break;
+        }
         case 'signedOut':
-          setState({ user: null, isLoading: false, isAuthenticated: false });
+          setState({ user: null, isLoading: false, isAuthenticated: false, authError: null });
           break;
       }
     });
@@ -61,9 +72,7 @@ export function useAuth() {
     return unsubscribe;
   }, [refresh]);
 
-  const signIn = useCallback(() => signInWithRedirect(), []);
-
   const signOut = useCallback(() => amplifySignOut(), []);
 
-  return { ...state, signIn, signOut };
+  return { ...state, signOut };
 }

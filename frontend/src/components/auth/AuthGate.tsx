@@ -1,7 +1,8 @@
 /**
  * Top-level gate: nothing that talks to the cloud API mounts until the user
  * is signed in, and the one-time local-data migration has been resolved.
- * Composes `useAuth` (Cognito Hosted UI) with `MigrationGate`.
+ * Composes `useAuth` (Cognito via Amplify — in-app sign-in, or a Google /
+ * Facebook redirect) with `MigrationGate`.
  */
 import type { ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function AuthGate({ children }: Props) {
-  const { user, isLoading, isAuthenticated, signIn } = useAuth();
+  const { user, isLoading, isAuthenticated, authError } = useAuth();
 
   if (isLoading) {
     return (
@@ -27,7 +28,7 @@ export default function AuthGate({ children }: Props) {
   }
 
   if (!isAuthenticated || !user) {
-    return <SignInScreen onSignIn={signIn} />;
+    return <SignInScreen authError={authError} />;
   }
 
   return <MigrationGate userId={user.userId}>{children}</MigrationGate>;
