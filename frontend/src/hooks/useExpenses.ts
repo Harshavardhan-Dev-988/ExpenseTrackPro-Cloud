@@ -83,9 +83,13 @@ export const useExpenses = (filters?: FilterOptions) => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    await db.addExpense(expense);
-    setExpenses((prev) => [...prev, expense]);
-    return expense.id;
+    // The API assigns the real id (it ignores the one we send), so keep
+    // the server's — otherwise editing/deleting this entry before the next
+    // full reload would target an id the server has never heard of.
+    const serverId = await db.addExpense(expense);
+    const saved: Expense = { ...expense, id: serverId };
+    setExpenses((prev) => [...prev, saved]);
+    return serverId;
   }, []);
 
   const addExpenses = useCallback(

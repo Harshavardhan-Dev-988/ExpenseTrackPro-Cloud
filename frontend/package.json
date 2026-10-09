@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:aws": "vite --base=/",
     "build": "tsc -b && vite build",
     "build:deploy": "vite build",
     "lint": "eslint .",
