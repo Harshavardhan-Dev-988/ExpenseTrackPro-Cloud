@@ -17,6 +17,7 @@ from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 from .local_bundling import LocalApiBundling
+from .site_config import SiteConfig
 
 API_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "api")
 
@@ -48,6 +49,7 @@ class ApiStack(cdk.Stack):
         user_pool_client: cognito.UserPoolClient,
         table: dynamodb.TableV2,
         receipts_bucket: s3.Bucket,
+        site: SiteConfig,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -77,6 +79,8 @@ class ApiStack(cdk.Stack):
                     TWILIO_AUTH_TOKEN_SECRET_NAME
                 ).unsafe_unwrap(),
                 "TWILIO_WHATSAPP_NUMBER": TWILIO_WHATSAPP_NUMBER,
+                # Read by api/main.py's CORSMiddleware (same list as the HTTP API's CORS).
+                "APP_ORIGINS": ",".join(site.origins),
             },
         )
         table.grant_read_write_data(fn)
@@ -93,11 +97,7 @@ class ApiStack(cdk.Stack):
             "HttpApi",
             api_name=f"expense-track-pro-{stage}",
             cors_preflight=apigwv2.CorsPreflightOptions(
-                allow_origins=[
-                    "http://localhost:5173",
-                    "http://localhost:5193",
-                    "https://d3bttra9tv41h7.cloudfront.net",
-                ],
+                allow_origins=site.origins,
                 allow_methods=[
                     apigwv2.CorsHttpMethod.GET,
                     apigwv2.CorsHttpMethod.POST,

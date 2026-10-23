@@ -22,6 +22,8 @@ import aws_cdk as cdk
 from aws_cdk import aws_cognito as cognito
 from constructs import Construct
 
+from .site_config import SiteConfig
+
 GOOGLE_OAUTH_SECRET_NAME = "expense-track-pro/google-oauth-client-secret"
 GOOGLE_OAUTH_CLIENT_ID = "1017707731916-5vpkc9j635ner352bveedc8t4urgj5ra.apps.googleusercontent.com"
 
@@ -30,7 +32,7 @@ FACEBOOK_APP_ID = "1413826136840708"
 
 
 class AuthStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, *, stage: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, stage: str, site: SiteConfig, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         removal_policy = cdk.RemovalPolicy.DESTROY if stage != "prod" else cdk.RemovalPolicy.RETAIN
@@ -137,16 +139,8 @@ class AuthStack(cdk.Stack):
             o_auth=cognito.OAuthSettings(
                 flows=cognito.OAuthFlows(authorization_code_grant=True),
                 scopes=[cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
-                callback_urls=[
-                    "http://localhost:5173/",
-                    "http://localhost:5193/",
-                    "https://d3bttra9tv41h7.cloudfront.net/",
-                ],
-                logout_urls=[
-                    "http://localhost:5173/",
-                    "http://localhost:5193/",
-                    "https://d3bttra9tv41h7.cloudfront.net/",
-                ],
+                callback_urls=site.callback_urls,
+                logout_urls=site.callback_urls,
             ),
             supported_identity_providers=[
                 cognito.UserPoolClientIdentityProvider.COGNITO,

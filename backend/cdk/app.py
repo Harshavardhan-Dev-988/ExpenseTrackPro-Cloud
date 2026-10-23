@@ -20,6 +20,7 @@ from stacks.data_stack import DataStack
 from stacks.api_stack import ApiStack
 from stacks.monitoring_stack import MonitoringStack
 from stacks.frontend_stack import FrontendStack
+from stacks.site_config import SiteConfig
 
 app = cdk.App()
 
@@ -27,13 +28,17 @@ app = cdk.App()
 # copy of the whole stack (each gets its own Cognito pool, table and API).
 stage = app.node.try_get_context("stage") or os.environ.get("APP_STAGE", "dev")
 
+# The app's web address(es): CloudFront default URL, plus an optional custom
+# domain from cdk.json context (customDomain / hostedZoneName / certificateArn).
+site = SiteConfig.from_context(app)
+
 env = cdk.Environment(
     account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
     region=os.environ.get("CDK_DEFAULT_REGION", "ap-southeast-2"),
 )
 
-auth_stack = AuthStack(app, f"ExpenseTrack-Auth-{stage}", stage=stage, env=env)
-data_stack = DataStack(app, f"ExpenseTrack-Data-{stage}", stage=stage, env=env)
+auth_stack = AuthStack(app, f"ExpenseTrack-Auth-{stage}", stage=stage, site=site, env=env)
+data_stack = DataStack(app, f"ExpenseTrack-Data-{stage}", stage=stage, site=site, env=env)
 api_stack = ApiStack(
     app,
     f"ExpenseTrack-Api-{stage}",
@@ -42,6 +47,7 @@ api_stack = ApiStack(
     user_pool_client=auth_stack.user_pool_client,
     table=data_stack.table,
     receipts_bucket=data_stack.receipts_bucket,
+    site=site,
     env=env,
 )
 api_stack.add_dependency(auth_stack)
@@ -62,7 +68,7 @@ monitoring_stack = MonitoringStack(
 )
 monitoring_stack.add_dependency(api_stack)
 
-frontend_stack = FrontendStack(app, f"ExpenseTrack-Frontend-{stage}", stage=stage, env=env)
+frontend_stack = FrontendStack(app, f"ExpenseTrack-Frontend-{stage}", stage=stage, site=site, env=env)
 
 for stack in (auth_stack, data_stack, api_stack, monitoring_stack, frontend_stack):
     cdk.Tags.of(stack).add("project", "expense-track-pro")

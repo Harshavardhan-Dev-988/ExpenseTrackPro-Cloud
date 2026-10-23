@@ -27,9 +27,11 @@ from aws_cdk import aws_dynamodb as dynamodb
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
+from .site_config import SiteConfig
+
 
 class DataStack(cdk.Stack):
-    def __init__(self, scope: Construct, construct_id: str, *, stage: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, stage: str, site: SiteConfig, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         removal_policy = cdk.RemovalPolicy.DESTROY if stage != "prod" else cdk.RemovalPolicy.RETAIN
@@ -64,11 +66,7 @@ class DataStack(cdk.Stack):
             cors=[
                 s3.CorsRule(
                     allowed_methods=[s3.HttpMethods.PUT, s3.HttpMethods.GET],
-                    allowed_origins=[
-                        "http://localhost:5173",
-                        "http://localhost:5193",
-                        "https://d3bttra9tv41h7.cloudfront.net",
-                    ],
+                    allowed_origins=site.origins,
                     allowed_headers=["*"],
                     max_age=3000,
                 )

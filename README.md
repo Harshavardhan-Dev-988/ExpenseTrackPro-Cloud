@@ -159,7 +159,8 @@ flowchart LR
 │           ├── data_stack.py         DynamoDB table (+ key design doc), receipts bucket
 │           ├── api_stack.py          Lambda, HTTP API, authorizer, routes, env vars
 │           ├── monitoring_stack.py   CloudWatch alarms + SNS email topic
-│           ├── frontend_stack.py     site bucket + CloudFront + deployment of frontend/dist-aws
+│           ├── frontend_stack.py     site bucket + CloudFront (+ optional custom domain) + deployment of frontend/dist-aws
+│           ├── site_config.py        the app's origins in one place (CloudFront URL, dev ports, custom domain)
 │           └── local_bundling.py     Docker-free Lambda dependency bundling
 └── frontend/
     ├── index.html, vite.config.ts, tailwind.config.js, eslint.config.js
@@ -518,9 +519,10 @@ Secrets are read **at deploy time**, so after changing one, redeploy the stack t
 | Alert email | `app.py` (`ALERT_EMAIL` env var overrides) |
 | User pool id, client id, OAuth domain, redirect URLs | `frontend/src/config/amplify.ts` |
 | API base URL | `frontend/src/services/cloudApi.ts` → `API_BASE_URL` |
-| Allowed origins / callback URLs | `auth_stack.py` (callbacks), `api_stack.py` (HTTP API CORS), `api/main.py` (FastAPI CORS), `data_stack.py` (receipts bucket CORS) |
+| Allowed origins / callback URLs | `backend/cdk/stacks/site_config.py` feeds Cognito callbacks, HTTP API CORS, receipts bucket CORS and the Lambda's `APP_ORIGINS` (read by `api/main.py`) |
+| Custom domain | `backend/cdk/cdk.json` context `customDomain`, `hostedZoneName`, `certificateArn`; `frontend/src/config/amplify.ts` → `CUSTOM_DOMAIN_URL` |
 
-If you add a new origin (a custom domain, another dev port), add it to **all four** origin lists and to `amplify.ts`'s redirect URLs.
+To add an origin, change `site_config.py` (or set the custom-domain context below) and the matching redirect URLs in `amplify.ts`; every CDK origin list is built from that one file.
 
 ### External consoles
 
@@ -684,6 +686,25 @@ Always run `cdk diff <stack>` first. `--exclusively` stops CDK from also redeplo
 
 > **Be careful with Auth and Data stack changes.** Some property changes *replace* the resource: a new user pool means every user must sign up again, and a replaced table loses its data in non-prod (it's `DESTROY`). `cdk diff` marks these as `[-]/[+]` with "replace" — stop and rethink if you see one.
 
+### Custom domain
+
+The app is always reachable on its CloudFront URL. To serve it at a proper address such as `https://app.example.com`:
+
+1. **Buy the domain in Route 53** (console → Route 53 → Registered domains → Register domains). Route 53 creates a hosted zone for it automatically. Registration can take a few minutes to a few hours; wait for the "successful" email.
+2. **Request a certificate in us-east-1.** Switch the console Region to *US East (N. Virginia)* — CloudFront only uses certificates from there — then Certificate Manager → Request → public certificate for `app.example.com`, DNS validation → **Create records in Route 53**. Wait until the status is *Issued* (usually under 10 minutes) and copy its ARN.
+3. **Set the context** in `backend/cdk/cdk.json`:
+   ```json
+   "customDomain": "app.example.com",
+   "hostedZoneName": "example.com",
+   "certificateArn": "arn:aws:acm:us-east-1:<account>:certificate/<id>"
+   ```
+   and `CUSTOM_DOMAIN_URL = 'https://app.example.com/'` in `frontend/src/config/amplify.ts`.
+4. **Deploy:** `npm run build:aws`, then `cdk deploy ExpenseTrack-Auth-dev ExpenseTrack-Data-dev ExpenseTrack-Api-dev ExpenseTrack-Frontend-dev`.
+
+What that deploy does: adds the domain and certificate to CloudFront, creates A/AAAA alias records in the hosted zone, adds the origin to Cognito callbacks and every CORS list, and attaches a CloudFront Function that 301-redirects the old `*.cloudfront.net` address to the new one (path and query string kept). Google and Facebook need no change: their redirect URI is the Cognito domain, not the app's.
+
+The certificate is created by hand because this AWS project can't run CloudFormation in us-east-1 (ACM itself is allowed there). Cost: the domain's yearly fee plus $0.50/month for the hosted zone; the certificate is free.
+
 ### Rollback
 
 Every deploy is a CloudFormation change set; if a stack update fails, CloudFormation rolls it back automatically. To roll back code that deployed successfully, check out the previous commit, rebuild, and redeploy the affected stack.
@@ -754,5 +775,5 @@ Everything is serverless and pay-per-use (Lambda, HTTP API, on-demand DynamoDB, 
 - No GSIs or date-sorted keys: loading a user's data is a full-partition query (fine at current scale).
 - Receipt uploads aren't size-limited or content-verified after upload.
 - WhatsApp runs on Twilio's trial sender (≤ 5 verified numbers) and the real Twilio Auth Token is not yet stored.
-- No custom domain; the site uses the CloudFront default domain.
+- No custom domain yet; the wiring is in place (see [Custom domain](#custom-domain)) and switches on once a domain and certificate exist.
 - The old GitHub Pages deploy scripts (`npm run deploy`, `vite.config.ts` base `/ExpenseTrack-Pro/`) remain but are no longer the primary hosting.
