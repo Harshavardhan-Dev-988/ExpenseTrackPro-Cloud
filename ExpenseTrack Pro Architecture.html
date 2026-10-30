@@ -1,0 +1,1289 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>ExpenseTrack Pro Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500;600&family=Karla:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: an engineering ledger — a ruled "ledger sheet" hero with the system's figures,
+   then a sticky index beside one reading column; diagrams sit full column width and scroll sideways on phones.
+   Palette and faces are the app's own "The Ledger" system: paper, ink, pine, brass, ember. */
+:root{
+  --paper:#EEF1EE; --surface:#FFFFFF; --sunk:#E5E9E4; --ink:#17211D; --muted:#56655E; --faint:#89948E; --line:#D5DAD3;
+  --pine:#2F4D3F; --pine-soft:rgba(47,77,63,.09); --pine-mid:rgba(47,77,63,.22);
+  --brass:#A9762E; --brass-soft:rgba(169,118,46,.11); --brass-mid:rgba(169,118,46,.28);
+  --ember:#B3492F; --ember-soft:rgba(179,73,47,.09);
+  --slate:#4B5C70; --slate-soft:rgba(75,92,112,.10);
+  --on-accent:#FFFFFF; --code-bg:#17211D; --code-fg:#E3EAE4; --code-dim:#8FA197; --code-hi:#D6A55C;
+  --display:"Fraunces", Georgia, "Times New Roman", serif;
+  --body:"Karla", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#121A16; --surface:#1A2520; --sunk:#16201B; --ink:#ECF1EC; --muted:#A4B2AA; --faint:#77867E; --line:#2D3B33;
+  --pine:#7AA891; --pine-soft:rgba(122,168,145,.11); --pine-mid:rgba(122,168,145,.28);
+  --brass:#D6A55C; --brass-soft:rgba(214,165,92,.12); --brass-mid:rgba(214,165,92,.30);
+  --ember:#E08468; --ember-soft:rgba(224,132,104,.12);
+  --slate:#9DB1C7; --slate-soft:rgba(157,177,199,.12);
+  --on-accent:#121A16; --code-bg:#0C120F; --code-fg:#DCE5DE; --code-dim:#7D8F85; --code-hi:#E8BD7A;
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --paper:#121A16; --surface:#1A2520; --sunk:#16201B; --ink:#ECF1EC; --muted:#A4B2AA; --faint:#77867E; --line:#2D3B33;
+  --pine:#7AA891; --pine-soft:rgba(122,168,145,.11); --pine-mid:rgba(122,168,145,.28);
+  --brass:#D6A55C; --brass-soft:rgba(214,165,92,.12); --brass-mid:rgba(214,165,92,.30);
+  --ember:#E08468; --ember-soft:rgba(224,132,104,.12);
+  --slate:#9DB1C7; --slate-soft:rgba(157,177,199,.12);
+  --on-accent:#121A16; --code-bg:#0C120F; --code-fg:#DCE5DE; --code-dim:#7D8F85; --code-hi:#E8BD7A;
+  color-scheme:dark; }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--pine);text-underline-offset:3px}
+code,.mono{font-family:var(--mono);font-size:.86em}
+p code,li code,td code,.note code{background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:.05em .35em;overflow-wrap:anywhere}
+[hidden]{display:none!important}
+.mode>*,.grid2>*,.grid3>*{min-width:0}
+.code{max-width:100%}
+td code{white-space:normal;word-break:break-word}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px;border-radius:4px}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.15;text-wrap:balance;margin:0}
+p{margin:0}
+
+/* ───────── Hero ───────── */
+.hero{border-bottom:1px solid var(--line);background:
+   repeating-linear-gradient(to bottom, transparent 0 31px, var(--line) 31px 32px);}
+.hero-in{max-width:1240px;margin:0 auto;padding:48px 24px 40px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:48px;align-items:start}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pine);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--brass)}
+.hero h1{font-size:clamp(2.2rem,4.6vw,3.6rem);margin:14px 0 16px;letter-spacing:-.01em;font-weight:600}
+.hero h1 em{font-style:italic;font-weight:400;color:var(--pine)}
+.lede{font-size:1.08rem;color:var(--muted);max-width:60ch}
+.endpoints{margin-top:24px;display:grid;gap:8px;max-width:640px}
+.ep{display:flex;gap:12px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 14px;min-width:0}
+.ep b{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500;flex:0 0 74px}
+.ep a,.ep span{font-family:var(--mono);font-size:13px;overflow-wrap:anywhere;min-width:0}
+
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:0 1px 0 var(--line),0 18px 40px -28px rgba(23,33,29,.45);position:relative;padding:18px 0 8px}
+.sheet::before{content:"";position:absolute;left:44px;top:0;bottom:0;width:1px;background:var(--ember);opacity:.55}
+.sheet-h{display:flex;justify-content:space-between;padding:0 18px 10px 58px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);border-bottom:2px solid var(--ink)}
+.sheet ol{list-style:none;margin:0;padding:0}
+.sheet li{display:grid;grid-template-columns:44px 1fr auto;align-items:baseline;border-bottom:1px solid var(--line);padding:7px 18px 7px 0;font-variant-numeric:tabular-nums}
+.sheet li:last-child{border-bottom:0}
+.sheet .ln{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:center}
+.sheet .lbl{padding-left:14px;font-size:14.5px}
+.sheet .lbl small{display:block;color:var(--muted);font-size:12px;line-height:1.35}
+.sheet .fig{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--pine);text-align:right;padding-left:12px}
+.sheet .fig.brass{color:var(--brass)}
+
+/* ───────── Shell: index + column ───────── */
+.shell{max-width:1240px;margin:0 auto;padding-inline:24px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
+.index{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-block:36px;max-height:100vh;overflow:auto}
+.index h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:0 0 10px;font-weight:500}
+.index nav{display:flex;flex-direction:column;gap:1px}
+.index a{display:flex;gap:10px;align-items:baseline;text-decoration:none;color:var(--muted);font-size:14px;padding:5px 10px;border-radius:7px;line-height:1.3}
+.index a span{font-family:var(--mono);font-size:10.5px;color:var(--faint);min-width:22px}
+.index a:hover{background:var(--sunk);color:var(--ink)}
+.index a.on{background:var(--pine-soft);color:var(--pine);font-weight:600}
+.index a.on span{color:var(--pine)}
+main{min-width:0;padding-block:12px 80px}
+
+.sec{padding-top:44px;border-top:1px solid var(--line);margin-top:44px}
+.sec:first-child{border-top:0;margin-top:0}
+.sec-h{display:grid;grid-template-columns:auto 1fr;column-gap:16px;row-gap:8px;align-items:baseline;margin-bottom:22px}
+.sec-n{font-family:var(--display);font-style:italic;font-size:1.5rem;color:var(--brass);line-height:1}
+.sec-h h2{font-size:clamp(1.55rem,2.6vw,2.05rem)}
+.sec-h p{grid-column:2;color:var(--muted);max-width:68ch}
+h3{font-size:1.18rem;margin:30px 0 12px}
+h3 .tag{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--faint);letter-spacing:.06em;margin-left:8px}
+.prose{max-width:70ch;display:grid;gap:12px;color:var(--ink)}
+.muted{color:var(--muted)}
+
+/* Figure frames */
+.fig-frame{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.fig-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.fig-cap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);background:var(--sunk)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend .ln-solid,.legend .ln-dash{width:22px;height:0;border-radius:0;border-top:1.6px solid var(--muted);vertical-align:3px}
+.legend .ln-dash{border-top-style:dashed}
+
+/* SVG diagram vocabulary (all colours from tokens) */
+svg text{font-family:var(--body)}
+.z{fill:none;stroke-width:1.2;stroke-dasharray:5 5}
+.z-client{stroke:var(--slate);fill:var(--slate-soft)}
+.z-aws{stroke:var(--pine);fill:var(--pine-soft)}
+.z-ext{stroke:var(--brass);fill:var(--brass-soft)}
+.z-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;fill:var(--muted);font-weight:500}
+.node rect{fill:var(--surface);stroke:var(--line);stroke-width:1.2;transition:stroke .15s, opacity .15s}
+.node{cursor:pointer;transition:opacity .15s}
+.node:focus{outline:none}
+.node:focus-visible rect,.node.sel rect{stroke-width:2.2}
+.t-client rect{stroke:var(--slate)} .t-aws rect{stroke:var(--pine)} .t-data rect{stroke:var(--brass)} .t-ext rect{stroke:var(--brass);stroke-dasharray:4 3} .t-ops rect{stroke:var(--ember)}
+.t-client .pip{fill:var(--slate)} .t-aws .pip{fill:var(--pine)} .t-data .pip{fill:var(--brass)} .t-ext .pip{fill:var(--brass)} .t-ops .pip{fill:var(--ember)}
+.n-title{font-weight:700;font-size:13.5px;fill:var(--ink)}
+.n-sub{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
+.edge{fill:none;stroke:var(--muted);stroke-width:1.4;transition:opacity .15s, stroke .15s}
+.edge.dash{stroke-dasharray:5 4}
+.e-label{font-family:var(--mono);font-size:10px;fill:var(--muted);paint-order:stroke;stroke:var(--paper);stroke-width:5px;stroke-linejoin:round}
+.hld-wrap svg .e-label{stroke:var(--surface)}
+.ah{fill:var(--muted)}
+.hot .edge.on{stroke:var(--pine);stroke-width:2}
+.hot .edge:not(.on),.hot .e-label:not(.on){opacity:.18}
+.hot .node:not(.on){opacity:.35}
+.hld-wrap svg{display:block;width:100%;height:auto;min-width:860px}
+
+.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:20px;padding:18px 20px;border-top:1px solid var(--line)}
+.detail .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.detail h4{font-family:var(--display);font-size:1.3rem;margin:4px 0 6px;font-weight:600}
+.detail .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--mono);font-size:11.5px;padding:3px 8px;border-radius:999px;background:var(--sunk);border:1px solid var(--line);color:var(--ink);white-space:nowrap}
+.chip.pine{background:var(--pine-soft);border-color:var(--pine-mid);color:var(--pine)}
+.chip.brass{background:var(--brass-soft);border-color:var(--brass-mid);color:var(--brass)}
+.chip.ember{background:var(--ember-soft);border-color:transparent;color:var(--ember)}
+.detail ul{margin:0;padding-left:18px;display:grid;gap:4px;color:var(--ink);font-size:14.5px}
+
+/* Decision cards */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;min-width:0}
+.card h4{margin:0 0 6px;font-size:15px;font-weight:700}
+.card p{font-size:14.5px;color:var(--muted)}
+.card .why{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--brass);margin-bottom:6px}
+
+/* Steps strip */
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;counter-reset:st;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.step{padding:16px 16px 18px;border-right:1px solid var(--line);position:relative;min-width:0}
+.step:last-child{border-right:0}
+.step .no{font-family:var(--mono);font-size:11px;color:var(--on-accent);background:var(--pine);border-radius:999px;width:22px;height:22px;display:inline-grid;place-items:center;font-weight:600}
+.step h4{font-size:14.5px;margin:10px 0 4px}
+.step p{font-size:13.5px;color:var(--muted)}
+.step .where{display:block;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--pine);overflow-wrap:anywhere}
+.step.gate{background:var(--pine-soft)}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sunk);white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:12.5px}
+.grp td{background:var(--sunk);font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 14px}
+
+.m{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;min-width:54px;text-align:center;letter-spacing:.04em}
+.m-GET{background:var(--pine-soft);color:var(--pine)}
+.m-POST{background:var(--brass-soft);color:var(--brass)}
+.m-PUT{background:var(--slate-soft);color:var(--slate)}
+.m-DELETE{background:var(--ember-soft);color:var(--ember)}
+.open{font-family:var(--mono);font-size:10px;color:var(--ember);border:1px solid var(--ember);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
+
+/* Stack graph & cards */
+.cdk-wrap svg{display:block;width:100%;height:auto;min-width:640px}
+.stack-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px;margin-top:14px}
+.stack-cards .card h4{font-family:var(--mono);font-size:13px;color:var(--pine)}
+.stack-cards ul{margin:8px 0 0;padding-left:16px;font-size:14px;display:grid;gap:3px}
+.stack-cards .out{margin-top:10px;display:flex;flex-wrap:wrap;gap:5px}
+
+/* Layer cake (backend LLD) */
+.cake{display:grid;gap:10px}
+.layer{display:grid;grid-template-columns:150px minmax(0,1fr);border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden}
+.layer>.lname{padding:14px 16px;background:var(--sunk);border-right:1px solid var(--line);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.layer>.lbody{padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.mod{border:1px solid var(--line);border-radius:9px;padding:7px 11px;background:var(--paper);min-width:0}
+.mod b{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);display:block}
+.mod small{font-size:12.5px;color:var(--muted);display:block;line-height:1.35}
+.mod.pine{border-color:var(--pine-mid);background:var(--pine-soft)}
+.mod.brass{border-color:var(--brass-mid);background:var(--brass-soft)}
+.down{display:flex;justify-content:center;color:var(--faint);font-family:var(--mono);font-size:11px;gap:8px;align-items:center;margin:-4px 0}
+.down::before{content:"";width:1px;height:14px;background:var(--faint)}
+
+/* Provider tree */
+.tree{font-family:var(--mono);font-size:12.5px}
+.tnode{border:1px solid var(--line);border-radius:10px;padding:8px 10px 10px 12px;background:var(--surface);margin-top:8px}
+.tnode .tn{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tnode .tn b{color:var(--pine)}
+.tnode .tn span{color:var(--muted);font-family:var(--body);font-size:13px}
+.tnode .tnode{background:var(--paper)}
+.tnode .tnode .tnode{background:var(--surface)}
+
+/* Flows */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer}
+.tab:hover{border-color:var(--pine-mid)}
+.tab[aria-selected="true"]{background:var(--pine);color:var(--on-accent);border-color:var(--pine)}
+.flow-head{padding:16px 20px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.flow-head h4{font-family:var(--display);font-size:1.25rem;margin:0;font-weight:600}
+.flow-head p{color:var(--muted);font-size:14.5px;max-width:75ch}
+.seq svg{display:block;width:100%;height:auto;min-width:720px}
+.seq-p rect{fill:var(--surface);stroke:var(--pine);stroke-width:1.2}
+.seq-p .pt{font-weight:700;font-size:12.5px;fill:var(--ink)}
+.seq-p .ps{font-family:var(--mono);font-size:9.5px;fill:var(--muted)}
+.life{stroke:var(--line);stroke-width:1.4;stroke-dasharray:3 4}
+.msg{stroke:var(--ink);stroke-width:1.3;fill:none}
+.msg.reply{stroke:var(--pine);stroke-dasharray:5 4}
+.mt{font-family:var(--mono);font-size:10.5px;fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
+.mt.reply{fill:var(--pine)}
+.sn{font-family:var(--mono);font-size:9.5px;fill:var(--faint)}
+.note-r{fill:var(--brass-soft);stroke:var(--brass-mid)}
+.note-t{font-family:var(--body);font-size:12px;fill:var(--ink);font-style:italic}
+.ah-ink{fill:var(--ink)} .ah-pine{fill:var(--pine)}
+
+/* Ladders */
+.ladders{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:14px}
+.ladder svg{display:block;width:100%;height:auto;min-width:440px}
+#lad-wa svg{min-width:640px}
+.ladder .fig-cap{border-top:0;border-bottom:1px solid var(--line)}
+.lq{fill:var(--surface);stroke:var(--pine);stroke-width:1.3}
+.la{fill:var(--pine-soft);stroke:var(--pine-mid)}
+.ls{fill:var(--pine);stroke:none}
+.lst{fill:var(--on-accent);font-family:var(--mono);font-size:11px;font-weight:600}
+.lt{font-family:var(--mono);font-size:10.5px;fill:var(--ink)}
+.lx-err{fill:var(--ember-soft);stroke:var(--ember)} .lx-ok{fill:var(--pine-soft);stroke:var(--pine)} .lx-info{fill:var(--brass-soft);stroke:var(--brass)}
+.lxl{font-family:var(--mono);font-size:10px;fill:var(--muted);font-weight:600}
+
+/* Data model */
+.parts{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
+.part{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.part-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12.5px}
+.part-h span{opacity:.7;font-size:11px}
+.sk{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr);border-top:1px solid var(--line);font-size:13px}
+.sk:first-of-type{border-top:0}
+.sk .skk{padding:8px 12px;font-family:var(--mono);font-size:12px;border-right:1px solid var(--line);overflow-wrap:anywhere;display:flex;gap:8px;align-items:baseline}
+.sk .skk i{font-style:normal;width:8px;height:8px;border-radius:2px;flex:0 0 8px;transform:translateY(-1px)}
+.sk .ska{padding:8px 12px;color:var(--muted);font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere}
+.sk .ska b{color:var(--ink);font-weight:500}
+.sk-sep{padding:5px 12px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);background:var(--sunk);border-top:1px solid var(--line)}
+.e-exp{background:var(--pine)} .e-bud{background:var(--brass)} .e-sav{background:var(--slate)} .e-set{background:var(--faint)} .e-wa{background:var(--ember)}
+.side-parts{display:grid;gap:14px}
+.ttl{font-family:var(--mono);font-size:10.5px;color:var(--ember);border:1px dashed var(--ember);border-radius:4px;padding:0 5px;margin-left:4px}
+.s3path{font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:0;align-items:center;padding:14px;overflow-wrap:anywhere}
+.s3path span{padding:4px 8px;border:1px solid var(--line);background:var(--paper)}
+.s3path span:first-child{border-radius:7px 0 0 7px}
+.s3path span:last-child{border-radius:0 7px 7px 0}
+.s3path .v{background:var(--brass-soft);border-color:var(--brass-mid);color:var(--brass)}
+
+/* Stack */
+.stack-col h4{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:0 0 10px;font-weight:600}
+.stack-col dl{margin:0;display:grid;gap:0}
+.stack-col .row{display:grid;grid-template-columns:minmax(0,1fr);padding:8px 0;border-top:1px solid var(--line)}
+.stack-col dt{font-weight:700;font-size:14.5px}
+.stack-col dt small{font-family:var(--mono);font-weight:400;color:var(--pine);font-size:11.5px;margin-left:6px}
+.stack-col dd{margin:0;color:var(--muted);font-size:13.5px}
+
+/* Code */
+.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:10px;font-family:var(--mono);font-size:12.5px;line-height:1.65}
+.code pre{margin:0;padding:14px 16px;overflow-x:auto;white-space:pre}
+.code .c{color:var(--code-dim)}
+.code .h{color:var(--code-hi)}
+.copy{position:absolute;top:8px;right:8px;font:inherit;font-size:11px;background:rgba(255,255,255,.08);color:var(--code-fg);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 9px;cursor:pointer}
+.copy:hover{background:rgba(255,255,255,.16)}
+.mode{display:grid;gap:12px}
+.mode .note{font-size:14px;color:var(--muted);max-width:75ch}
+.callout{border:1px solid var(--brass-mid);background:var(--brass-soft);border-radius:10px;padding:12px 14px;font-size:14px;max-width:80ch}
+.callout.ember{border-color:var(--ember);background:var(--ember-soft)}
+.callout b{font-weight:700}
+
+/* Pipeline */
+.pipe{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.pipe .pp{border:1px solid var(--pine-mid);background:var(--pine-soft);color:var(--pine);font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:8px}
+.pipe .pp.warn{border-color:var(--brass-mid);background:var(--brass-soft);color:var(--brass)}
+.pipe .arr{color:var(--faint);font-family:var(--mono)}
+.firsttime{list-style:none;margin:0;padding:0;display:grid;gap:0;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);counter-reset:ft}
+.firsttime li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 0;padding:12px 16px 12px 0;border-top:1px solid var(--line);counter-increment:ft}
+.firsttime li:first-child{border-top:0}
+.firsttime li::before{content:counter(ft);font-family:var(--mono);font-size:12px;color:var(--brass);text-align:center;font-weight:600;padding-top:1px}
+.firsttime b{font-size:14.5px}
+.firsttime p{grid-column:2;font-size:13.5px;color:var(--muted)}
+.firsttime code{font-size:12px}
+
+.status{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:999px;white-space:nowrap;display:inline-block}
+.st-ok{background:var(--pine-soft);color:var(--pine)}
+.st-warn{background:var(--brass-soft);color:var(--brass)}
+.st-bad{background:var(--ember-soft);color:var(--ember)}
+
+/* Alarms */
+.alarms{display:grid;gap:8px}
+.alarm{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--ember);border-radius:8px;padding:10px 14px}
+.alarm b{font-family:var(--mono);font-size:12.5px}
+.alarm span{color:var(--muted);font-size:13.5px}
+
+/* Search */
+.search{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.search input{font:inherit;font-size:14.5px;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);width:min(100%,360px)}
+.search small{color:var(--faint);font-family:var(--mono);font-size:11.5px}
+.ts{display:grid;gap:8px}
+.ts details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 14px}
+.ts summary{cursor:pointer;padding:11px 0;font-weight:600;font-size:14.5px;list-style:none;display:flex;gap:10px;align-items:baseline}
+.ts summary::-webkit-details-marker{display:none}
+.ts summary::before{content:"+";font-family:var(--mono);color:var(--brass);width:12px;flex:0 0 12px}
+.ts details[open] summary::before{content:"−"}
+.ts details p{padding:0 0 12px 22px;color:var(--muted);font-size:14px}
+.debt{columns:2 300px;column-gap:28px;padding:0;margin:0;list-style:none}
+.debt li{break-inside:avoid;padding:9px 0 9px 22px;border-top:1px solid var(--line);position:relative;font-size:14.5px}
+.debt li::before{content:"";position:absolute;left:2px;top:17px;width:9px;height:9px;border:1.5px solid var(--brass);border-radius:2px}
+footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);font-size:13px;margin-top:60px}
+
+/* ───────── Responsive ───────── */
+@media (max-width:1080px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:0;padding-inline:0}
+  main{padding-inline:20px}
+  .index{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;padding:8px 12px;background:var(--paper);border-bottom:1px solid var(--line);max-height:none;overflow:visible}
+  .index h4{display:none}
+  .index nav{flex-direction:row;overflow-x:auto;gap:4px;scrollbar-width:none}
+  .index nav::-webkit-scrollbar{display:none}
+  .index a{white-space:nowrap;padding:6px 10px}
+  .hero-in{grid-template-columns:minmax(0,1fr);gap:28px;padding:36px 20px 32px}
+}
+@media (max-width:760px){
+  .grid2,.grid3,.parts,.detail{grid-template-columns:minmax(0,1fr)}
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .step{border-right:0;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:0}
+  .layer{grid-template-columns:minmax(0,1fr)}
+  .layer>.lname{border-right:0;border-bottom:1px solid var(--line);padding:8px 14px}
+  .alarm{grid-template-columns:minmax(0,1fr)}
+  .sk{grid-template-columns:minmax(0,1fr)}
+  .sk .skk{border-right:0;padding-bottom:0}
+  .sec-h{grid-template-columns:minmax(0,1fr)}
+  .sec-h p{grid-column:1}
+  main{padding-inline:16px}
+  .hero-in{padding-inline:16px}
+  .ep{flex-direction:column;gap:2px}
+}
+</style>
+
+<header class="hero">
+  <div class="hero-in">
+    <div>
+      <div class="eyebrow"><span>ExpenseTrack Pro</span><span class="dot"></span><span>Engineering atlas</span></div>
+      <h1>How the ledger is built, <em>end to end</em></h1>
+      <p class="lede">A household expense tracker for Indian families. A React app on S3 and CloudFront calls a FastAPI app on Lambda through API Gateway. Cognito handles sign-in and DynamoDB stores the data. The infrastructure is AWS CDK in Python. This page is the visual companion to the repository README.</p>
+      <div class="endpoints">
+        <div class="ep"><b>App</b><a href="https://d3bttra9tv41h7.cloudfront.net" target="_blank" rel="noopener">d3bttra9tv41h7.cloudfront.net</a></div>
+        <div class="ep"><b>API</b><a href="https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com/health" target="_blank" rel="noopener">hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com</a></div>
+        <div class="ep"><b>Repo</b><a href="https://github.com/Harshavardhan-Dev-988/ExpenseTrackPro-Cloud" target="_blank" rel="noopener">Harshavardhan-Dev-988/ExpenseTrackPro-Cloud</a></div>
+        <div class="ep"><b>Stage</b><span>dev · ap-southeast-2 (Sydney) · account 719312763274</span></div>
+      </div>
+    </div>
+    <div class="sheet" aria-label="System figures">
+      <div class="sheet-h"><span>System in figures</span><span>dev stage</span></div>
+      <ol>
+        <li><span class="ln">01</span><span class="lbl">AWS Region<small>everything regional lives in ap-southeast-2</small></span><span class="fig">1</span></li>
+        <li><span class="ln">02</span><span class="lbl">CDK stacks per stage<small>Auth · Data · Api · Monitoring · Frontend</small></span><span class="fig">5</span></li>
+        <li><span class="ln">03</span><span class="lbl">Lambda functions<small>the whole FastAPI app, behind Mangum</small></span><span class="fig">1</span></li>
+        <li><span class="ln">04</span><span class="lbl">DynamoDB tables / GSIs<small>single table, one partition per user</small></span><span class="fig">1 / 0</span></li>
+        <li><span class="ln">05</span><span class="lbl">Gateway routes / API endpoints<small>/{proxy+} with JWT, /health and /whatsapp/webhook public</small></span><span class="fig">3 / 25</span></li>
+        <li><span class="ln">06</span><span class="lbl">Expense categories<small>in 13 groups, tuned for Indian households</small></span><span class="fig brass">81</span></li>
+        <li><span class="ln">07</span><span class="lbl">Secrets / CloudWatch alarms<small>secrets resolved at deploy time; alarms go to email</small></span><span class="fig">3 / 5</span></li>
+        <li><span class="ln">08</span><span class="lbl">Presigned URL lifetime<small>receipts never pass through Lambda</small></span><span class="fig brass">300 s</span></li>
+      </ol>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="index">
+    <h4>Contents</h4>
+    <nav id="toc">
+      <a href="#hld"><span>§1</span>System design</a>
+      <a href="#lifecycle"><span>§2</span>Life of a request</a>
+      <a href="#infra"><span>§3</span>Infrastructure</a>
+      <a href="#backend"><span>§4</span>Inside the Lambda</a>
+      <a href="#frontend"><span>§5</span>Inside the SPA</a>
+      <a href="#flows"><span>§6</span>Sequence flows</a>
+      <a href="#logic"><span>§7</span>Branching logic</a>
+      <a href="#data"><span>§8</span>Data model</a>
+      <a href="#api"><span>§9</span>API reference</a>
+      <a href="#stack"><span>§10</span>Tech stack</a>
+      <a href="#config"><span>§11</span>Config &amp; secrets</a>
+      <a href="#local"><span>§12</span>Local development</a>
+      <a href="#deploy"><span>§13</span>Test &amp; deploy</a>
+      <a href="#ops"><span>§14</span>Monitoring</a>
+      <a href="#trouble"><span>§15</span>Troubleshooting</a>
+      <a href="#debt"><span>§16</span>Known limits</a>
+    </nav>
+  </aside>
+
+  <main>
+    <!-- §1 HLD -->
+    <section class="sec" id="hld">
+      <div class="sec-h"><span class="sec-n">§1</span><h2>System design</h2>
+        <p>High-level design of the dev stage. Select any box to see what it does, where it is defined, and which lines touch it.</p></div>
+      <div class="fig-frame hld-wrap">
+        <div class="fig-scroll"><svg id="hld-svg" viewBox="0 0 1180 650" role="img" aria-label="Architecture diagram: browser, CloudFront, Cognito, API Gateway, Lambda, DynamoDB, S3, Secrets Manager, CloudWatch, Twilio, Google and Facebook"></svg></div>
+        <div class="detail" id="hld-detail" aria-live="polite"></div>
+        <div class="fig-cap">
+          <div class="legend">
+            <span><i style="background:var(--slate)"></i>Client</span>
+            <span><i style="background:var(--pine)"></i>AWS service</span>
+            <span><i style="background:var(--brass)"></i>Storage / third party</span>
+            <span><i style="background:var(--ember)"></i>Alerting</span>
+            <span><i class="ln-solid"></i>Runtime call</span>
+            <span><i class="ln-dash"></i>Trust or deploy-time</span>
+          </div>
+          <span>Click a box to highlight its connections</span>
+        </div>
+      </div>
+
+      <h3>Design decisions</h3>
+      <div class="grid3">
+        <div class="card"><span class="why">Compute</span><h4>One Lambda for the whole API</h4><p>Routing happens inside FastAPI. One function keeps deploys simple and means only one cold start.</p></div>
+        <div class="card"><span class="why">Auth</span><h4>Tokens are checked at the gateway</h4><p>The JWT authorizer rejects bad tokens before Lambda runs. Route code only asks who the caller is.</p></div>
+        <div class="card"><span class="why">Storage</span><h4>Single-table DynamoDB</h4><p>Every read is one partition, <code>PK = USER#&lt;sub&gt;</code>, so no secondary indexes are needed.</p></div>
+        <div class="card"><span class="why">Files</span><h4>Receipts skip Lambda</h4><p>The browser uploads and downloads directly from S3 with 5-minute presigned URLs scoped to the caller.</p></div>
+        <div class="card"><span class="why">Secrets</span><h4>Not in git, not in templates</h4><p>CDK emits <code>{{resolve:secretsmanager:…}}</code> references. CloudFormation fills them in at deploy time.</p></div>
+        <div class="card"><span class="why">Public routes</span><h4>Two literal routes skip auth</h4><p><code>/health</code> and <code>/whatsapp/webhook</code> take precedence over the authorized <code>/{proxy+}</code> catch-all.</p></div>
+      </div>
+    </section>
+
+    <!-- §2 lifecycle -->
+    <section class="sec" id="lifecycle">
+      <div class="sec-h"><span class="sec-n">§2</span><h2>Life of a request</h2>
+        <p>What happens between a click and a DynamoDB read. Step 3 is the security gate: the Lambda never sees a request that failed it.</p></div>
+      <div class="steps">
+        <div class="step"><span class="no">1</span><h4>Get a token</h4><p>Amplify returns the Cognito ID token, refreshing it if needed.</p><span class="where">fetchAuthSession()</span></div>
+        <div class="step"><span class="no">2</span><h4>Call the API</h4><p>The only HTTP client sends <code>Authorization: Bearer</code>.</p><span class="where">services/cloudApi.ts</span></div>
+        <div class="step gate"><span class="no">3</span><h4>Gateway verifies</h4><p>Signature, issuer = user pool, audience = app client. Fail → 401.</p><span class="where">HTTP API JWT authorizer</span></div>
+        <div class="step"><span class="no">4</span><h4>Who is it?</h4><p>Mangum hands off to FastAPI; the verified <code>sub</code> claim is the user id.</p><span class="where">dependencies/auth.py</span></div>
+        <div class="step"><span class="no">5</span><h4>Read the partition</h4><p>Query <code>USER#&lt;sub&gt;</code>, return camelCase JSON.</p><span class="where">routers/* → db.py</span></div>
+      </div>
+      <p class="callout" style="margin-top:14px"><b>Why the ID token and not the access token?</b> The HTTP API authorizer checks <code>aud</code> against the app client id, and only Cognito's ID token carries <code>aud</code>.</p>
+    </section>
+
+    <!-- §3 infra -->
+    <section class="sec" id="infra">
+      <div class="sec-h"><span class="sec-n">§3</span><h2>Infrastructure (CDK)</h2>
+        <p><code>backend/cdk/app.py</code> builds five stacks per stage. Each stage is a separate copy with its own user pool, table, API and site. Set the stage with <code>-c stage=prod</code> or <code>APP_STAGE</code>.</p></div>
+      <div class="fig-frame cdk-wrap"><div class="fig-scroll"><svg id="cdk-svg" viewBox="0 0 800 220" role="img" aria-label="Stack dependency graph: Auth and Data feed Api, Api feeds Monitoring, Frontend stands alone"></svg></div>
+        <div class="fig-cap"><span>Arrows show what each stack passes to the next. <code>cdk deploy --all</code> deploys them in this order.</span></div></div>
+      <div class="stack-cards">
+        <div class="card"><h4>ExpenseTrack-Auth-&lt;stage&gt;</h4>
+          <ul><li>User pool <code>expense-track-pro-&lt;stage&gt;</code></li><li>Hosted domain for OAuth</li><li>Google and Facebook IdPs</li><li>Public SPA client (no secret)</li><li>Branded verification email</li></ul>
+          <div class="out"><span class="chip pine">UserPoolId</span><span class="chip pine">UserPoolClientId</span><span class="chip pine">HostedUiDomainUrl</span></div></div>
+        <div class="card"><h4>ExpenseTrack-Data-&lt;stage&gt;</h4>
+          <ul><li>DynamoDB table: PK/SK, on-demand, TTL <code>ttl</code></li><li>Point-in-time recovery in prod only</li><li>Receipts bucket: private, SSE-S3, CORS for app origins</li></ul>
+          <div class="out"><span class="chip pine">TableName</span><span class="chip pine">ReceiptsBucketName</span></div></div>
+        <div class="card"><h4>ExpenseTrack-Api-&lt;stage&gt;</h4>
+          <ul><li>Lambda: Python 3.12, 256 MB, 15 s</li><li>Read/write grants on table and bucket</li><li>HTTP API with Cognito authorizer, CORS and 3 routes</li><li>Docker-free bundling via <code>local_bundling.py</code></li></ul>
+          <div class="out"><span class="chip pine">ApiUrl</span></div></div>
+        <div class="card"><h4>ExpenseTrack-Monitoring-&lt;stage&gt;</h4>
+          <ul><li>SNS topic <code>expense-track-pro-alerts-&lt;stage&gt;</code></li><li>Email subscription</li><li>5 CloudWatch alarms (see §14)</li></ul></div>
+        <div class="card"><h4>ExpenseTrack-Frontend-&lt;stage&gt;</h4>
+          <ul><li>Private site bucket</li><li>CloudFront with OAC and HTTPS redirect</li><li>SPA fallback: 403/404 → <code>/index.html</code></li><li>Deploys <code>frontend/dist-aws</code> and invalidates <code>/*</code></li></ul>
+          <div class="out"><span class="chip pine">SiteUrl</span><span class="chip pine">SiteBucketName</span></div></div>
+        <div class="card" style="background:var(--sunk)"><h4 style="color:var(--ember)">Removal policy</h4>
+          <p>Outside prod, the table, buckets and user pool are <b>DESTROY</b> and buckets auto-empty, so <code>cdk destroy</code> removes everything. In prod they are <b>RETAIN</b>.</p></div>
+      </div>
+
+      <h3>HTTP API routes</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Route</th><th>Methods</th><th>Authorizer</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">/{proxy+}</td><td class="mono">GET POST PUT DELETE PATCH</td><td><span class="status st-ok">Cognito JWT</span></td><td>Everything in the FastAPI app</td></tr>
+          <tr><td class="mono">/health</td><td class="mono">GET</td><td><span class="status st-bad">none</span></td><td>Uptime check</td></tr>
+          <tr><td class="mono">/whatsapp/webhook</td><td class="mono">POST</td><td><span class="status st-bad">none</span></td><td>Twilio calls it; the app checks <code>X-Twilio-Signature</code> itself</td></tr>
+        </tbody></table></div>
+      <p class="callout" style="margin-top:12px"><b>OPTIONS is not routed on purpose.</b> API Gateway's built-in CORS responder answers preflights. Routing <code>ANY</code> would push preflights through the authorizer and break every cross-origin request.</p>
+
+      <h3>Lambda environment</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Variable</th><th>Source</th><th>Used by</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">TABLE_NAME</td><td>Data stack</td><td class="mono">db.py</td></tr>
+          <tr><td class="mono">RECEIPTS_BUCKET_NAME</td><td>Data stack</td><td class="mono">routers/receipts.py</td></tr>
+          <tr><td class="mono">STAGE</td><td><code>stage</code> context</td><td class="mono">dependencies/auth.py</td></tr>
+          <tr><td class="mono">TWILIO_AUTH_TOKEN</td><td>Secrets Manager, dynamic reference</td><td>webhook signature check</td></tr>
+          <tr><td class="mono">TWILIO_WHATSAPP_NUMBER</td><td>constant <code>+17372508034</code></td><td>shown to users when linking</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <!-- §4 backend -->
+    <section class="sec" id="backend">
+      <div class="sec-h"><span class="sec-n">§4</span><h2>Inside the Lambda</h2>
+        <p>Low-level design of <code>backend/api/</code>. The same FastAPI app runs on Lambda through Mangum and on a laptop under uvicorn.</p></div>
+      <div class="cake">
+        <div class="layer"><div class="lname">Event in</div><div class="lbody">
+          <div class="mod"><b>API Gateway v2 event</b><small>JWT claims already verified</small></div>
+          <div class="mod"><b>uvicorn (local)</b><small>no event; uses <code>X-Local-User-Id</code></small></div></div></div>
+        <div class="down">Mangum translates the event to ASGI</div>
+        <div class="layer"><div class="lname">Entry</div><div class="lbody">
+          <div class="mod pine"><b>lambda_handler.py</b><small>handler = Mangum(app)</small></div>
+          <div class="mod pine"><b>main.py</b><small>FastAPI app · CORSMiddleware · registers 7 routers</small></div></div></div>
+        <div class="down">route match</div>
+        <div class="layer"><div class="lname">Routers</div><div class="lbody">
+          <div class="mod"><b>health</b><small>/health</small></div>
+          <div class="mod"><b>expenses</b><small>/expenses</small></div>
+          <div class="mod"><b>settings</b><small>/settings</small></div>
+          <div class="mod"><b>budgets</b><small>/budgets/{category}</small></div>
+          <div class="mod"><b>savings</b><small>/savings/entries, /goals</small></div>
+          <div class="mod"><b>receipts</b><small>upload-url, view-url</small></div>
+          <div class="mod"><b>whatsapp</b><small>link-code, status, webhook</small></div></div></div>
+        <div class="down">Depends(get_user_id) · Pydantic validation</div>
+        <div class="layer"><div class="lname">Shared</div><div class="lbody">
+          <div class="mod brass"><b>dependencies/auth.py</b><small>get_user_id() returns the Cognito sub</small></div>
+          <div class="mod brass"><b>models.py</b><small>camelCase Pydantic models, mirror types/index.ts</small></div>
+          <div class="mod brass"><b>db.py</b><small>get / put / delete / query by SK prefix, float → Decimal</small></div></div></div>
+        <div class="down">boto3 (clients created lazily, so tests can mock them)</div>
+        <div class="layer"><div class="lname">AWS</div><div class="lbody">
+          <div class="mod"><b>DynamoDB</b><small>Table resource API</small></div>
+          <div class="mod"><b>S3</b><small>generate_presigned_url (PUT / GET, 300 s)</small></div></div></div>
+      </div>
+      <h3>Docker-free bundling <span class="tag">stacks/local_bundling.py</span></h3>
+      <div class="prose"><p>The Lambda package is built without Docker: <code>pip install --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12</code> into the asset folder, then the API source is copied in. Every dependency in <code>api/requirements.txt</code> must therefore ship a manylinux wheel. Pure-Python packages are fine.</p></div>
+    </section>
+
+    <!-- §5 frontend -->
+    <section class="sec" id="frontend">
+      <div class="sec-h"><span class="sec-n">§5</span><h2>Inside the SPA</h2>
+        <p>Low-level design of <code>frontend/src/</code>. There is no router: sections are tab state in <code>App.tsx</code>. Every mutation goes through a hook, then <code>cloudApi.ts</code>.</p></div>
+      <div class="grid2">
+        <div>
+          <h3 style="margin-top:0">Boot sequence <span class="tag">main.tsx</span></h3>
+          <div class="tree">
+            <div class="tnode"><div class="tn"><b>config/amplify.ts</b><span>imported first: pool, client, OAuth</span></div></div>
+            <div class="tnode"><div class="tn"><b>ErrorBoundary</b><span>last-resort crash screen</span></div>
+              <div class="tnode"><div class="tn"><b>ToastProvider</b><span>app-wide status toasts</span></div>
+                <div class="tnode"><div class="tn"><b>ConfirmProvider</b><span>promise-based confirm dialogs</span></div>
+                  <div class="tnode"><div class="tn"><b>AuthGate</b><span>no user → SignInScreen</span></div>
+                    <div class="tnode"><div class="tn"><b>MigrationGate</b><span>one-time IndexedDB → cloud</span></div>
+                      <div class="tnode" style="border-color:var(--pine-mid)"><div class="tn"><b>App</b><span>header, sections, modals, mutations</span></div></div>
+                    </div></div></div></div></div>
+          </div>
+        </div>
+        <div>
+          <h3 style="margin-top:0">Data path <span class="tag">component → API</span></h3>
+          <div class="cake">
+            <div class="layer"><div class="lname">View</div><div class="lbody"><div class="mod"><b>DashboardView, ExpenseList…</b><small>render; call App handlers</small></div></div></div>
+            <div class="layer"><div class="lname">Hooks</div><div class="lbody">
+              <div class="mod pine"><b>useExpenses</b><small>load once; local updates with server id</small></div>
+              <div class="mod pine"><b>useSettings</b><small>optimistic, rolls back</small></div>
+              <div class="mod"><b>useAuth</b><small>Hub events</small></div>
+              <div class="mod"><b>useAnalytics · useExportActions</b></div></div></div>
+            <div class="layer"><div class="lname">Services</div><div class="lbody">
+              <div class="mod brass"><b>cloudApi.ts</b><small>Bearer token, ISO ↔ Date, explicit nulls, 5-way fan-out</small></div>
+              <div class="mod"><b>backup · export · pdfGenerator · dashboardSnapshot</b></div></div></div>
+          </div>
+        </div>
+      </div>
+      <h3>App shell</h3>
+      <div class="grid3">
+        <div class="card"><h4>Sections</h4><p><code>dashboard</code>, <code>expenses</code>, <code>budgets</code>, <code>savings</code>, <code>analytics</code>. CloudFront's 403/404 fallback keeps future deep links safe.</p></div>
+        <div class="card"><h4>Header and ☰ menu</h4><p>Tabs and <b>Add expense</b> up top. Import, backup, export, WhatsApp, dark mode and sign-out live in the menu, which becomes a drawer on phones.</p></div>
+        <div class="card"><h4>Feedback</h4><p>Adds and edits toast. Deletes go through a confirm dialog. Bulk import and restore show progress toasts.</p></div>
+      </div>
+      <h3>Period logic <span class="tag">utils/period.ts</span></h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Function</th><th>What it does</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">resolvePeriod</td><td>Turns <code>today | month | year | all | custom</code> into dates and labels</td><td>“October 2026”</td></tr>
+          <tr><td class="mono">previousPeriod</td><td>Comparison window, like for like on a running period</td><td>Oct 1–9 vs Sep 1–9</td></tr>
+          <tr><td class="mono">bucketSeries</td><td>Groups the trend by day, week or month (see §7)</td><td>90 days → weeks</td></tr>
+          <tr><td class="mono">budgetWindow + computeBudgetStatus</td><td>Scales budgets to the period; “today” is judged against the month</td><td>₹13,000/month over a quarter = ₹39,000</td></tr>
+        </tbody></table></div>
+      <h3>Design system <span class="tag">src/index.css</span></h3>
+      <div class="prose"><p>“The Ledger”: <b style="color:var(--pine)">pine</b> for actions, <b style="color:var(--brass)">brass</b> for money and highlights, <b style="color:var(--ember)">ember</b> only for over-budget and destructive actions, on paper and ink. Tokens are RGB CSS variables exposed to Tailwind, so <code>bg-pine/10</code> works in both themes. Dark mode is a <code>dark</code> class on <code>&lt;html&gt;</code>. This page uses the same palette and faces.</p></div>
+    </section>
+
+    <!-- §6 flows -->
+    <section class="sec" id="flows">
+      <div class="sec-h"><span class="sec-n">§6</span><h2>Sequence flows</h2>
+        <p>The main control flows, step by step. Solid arrows are calls, dashed arrows are responses, and shaded notes mark side effects.</p></div>
+      <div class="tabs" role="tablist" id="flow-tabs"></div>
+      <div class="fig-frame">
+        <div class="flow-head" id="flow-head"></div>
+        <div class="fig-scroll seq" id="flow-svg"></div>
+        <div class="fig-cap" id="flow-cap"></div>
+      </div>
+    </section>
+
+    <!-- §7 logic -->
+    <section class="sec" id="logic">
+      <div class="sec-h"><span class="sec-n">§7</span><h2>Branching logic</h2>
+        <p>Decision paths read straight from the code. Each question either exits to the right or continues down.</p></div>
+      <div class="ladders">
+        <div class="fig-frame ladder"><div class="fig-cap"><b>Who is calling?</b><code>dependencies/auth.py · get_user_id</code></div><div class="fig-scroll" id="lad-auth"></div></div>
+        <div class="fig-frame ladder"><div class="fig-cap"><b>Trend granularity</b><code>utils/period.ts · bucketSeries</code></div><div class="fig-scroll" id="lad-bucket"></div></div>
+      </div>
+      <div class="fig-frame ladder" style="margin-top:14px"><div class="fig-cap"><b>WhatsApp webhook</b><code>routers/whatsapp.py · webhook</code></div><div class="fig-scroll" id="lad-wa"></div></div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="card"><h4>Signature check</h4><p><code>HMAC-SHA1(authToken, fullUrl + key+value of every form field, sorted)</code>, base64-encoded, compared in constant time with <code>X-Twilio-Signature</code>.</p></div>
+        <div class="card"><h4>Message parsing</h4><p>The first number is the amount (it may start with ₹, rs or inr). The rest is the description. A keyword table picks the category: auto → <code>auto_rickshaw</code>, petrol → <code>fuel</code>, dinner → <code>dine_out</code>, otherwise <code>other</code>.</p></div>
+      </div>
+    </section>
+
+    <!-- §8 data -->
+    <section class="sec" id="data">
+      <div class="sec-h"><span class="sec-n">§8</span><h2>Data model</h2>
+        <p>One DynamoDB table, keys <code>PK</code> and <code>SK</code>, on-demand billing, no secondary indexes. Rows below are shown in DynamoDB's own sort order; values are illustrative.</p></div>
+      <div class="parts">
+        <div class="part">
+          <div class="part-h"><b>PK = USER#&lt;sub&gt;</b><span>one partition holds everything a user owns</span></div>
+          <div class="sk-sep">SK sorts lexicographically</div>
+          <div class="sk"><div class="skk"><i class="e-bud"></i>BUDGET#grocery</div><div class="ska"><b>category</b>, monthlyLimit 13000, yearlyLimit?, budgetType "monthly", alertThreshold 80, isActive</div></div>
+          <div class="sk"><div class="skk"><i class="e-bud"></i>BUDGET#fuel</div><div class="ska">one item per category, upserted by <b>PUT /budgets/{category}</b></div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>EXPENSE#0b7c…e21</div><div class="ska"><b>id</b>, date, amount 450, category "dine_out", description, paymentMethod "upi", tags?, receiptUrl?, createdAt, updatedAt</div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>EXPENSE#9f31…a04</div><div class="ska">receiptUrl holds the S3 <b>key</b>, not a URL</div></div>
+          <div class="sk"><div class="skk"><i class="e-sav"></i>SAVINGS_ENTRY#4c2d…</div><div class="ska"><b>id</b>, date, amount, category, description, account?, interestRate?, maturityDate?, isRecurring?, tags?</div></div>
+          <div class="sk"><div class="skk"><i class="e-sav"></i>SAVINGS_GOAL#77ab…</div><div class="ska"><b>id</b>, name, targetAmount, currentAmount, deadline?, category, priority, isActive, createdAt</div></div>
+          <div class="sk"><div class="skk"><i class="e-set"></i>SETTINGS</div><div class="ska">currency "INR", dateFormat "DD/MM/YYYY", theme "system", locale "en-IN"</div></div>
+          <div class="sk"><div class="skk"><i class="e-wa"></i>WHATSAPP_LINK</div><div class="ska">phoneNumber "+91…" (user → phone direction)</div></div>
+        </div>
+        <div class="side-parts">
+          <div class="part"><div class="part-h"><b>PK = WHATSAPP#+91…</b><span>phone → user</span></div>
+            <div class="sk"><div class="skk"><i class="e-wa"></i>LINK</div><div class="ska">userId</div></div></div>
+          <div class="part"><div class="part-h"><b>PK = LINKCODE#QQ9HON</b><span>pending link</span></div>
+            <div class="sk"><div class="skk"><i class="e-wa"></i>PENDING</div><div class="ska">userId, ttl <span class="ttl">expires 15 min</span></div></div></div>
+          <div class="card"><h4>Why two link items?</h4><p>The webhook knows only the phone; the app knows only the user. Writing both directions makes each lookup a single <code>GetItem</code> without a GSI.</p></div>
+          <div class="legend" style="font-size:13px;color:var(--muted)">
+            <span><i class="e-exp"></i>Expense</span><span><i class="e-bud"></i>Budget</span><span><i class="e-sav"></i>Savings</span><span><i class="e-set"></i>Settings</span><span><i class="e-wa"></i>WhatsApp</span></div>
+        </div>
+      </div>
+
+      <h3>Access patterns</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Need</th><th>Operation</th><th>Key condition</th></tr></thead>
+        <tbody>
+          <tr><td>Load the ledger</td><td class="mono">Query (paginated)</td><td class="mono">PK = USER#sub, begins_with(SK, "EXPENSE#")</td></tr>
+          <tr><td>Budgets / savings entries / goals</td><td class="mono">Query</td><td class="mono">begins_with(SK, "BUDGET#" | "SAVINGS_ENTRY#" | "SAVINGS_GOAL#")</td></tr>
+          <tr><td>Settings, link status</td><td class="mono">GetItem</td><td class="mono">SK = SETTINGS | WHATSAPP_LINK</td></tr>
+          <tr><td>Who sent this WhatsApp message?</td><td class="mono">GetItem</td><td class="mono">PK = WHATSAPP#phone, SK = LINK</td></tr>
+          <tr><td>Redeem a link code</td><td class="mono">GetItem → Put ×2 → Delete</td><td class="mono">PK = LINKCODE#code, SK = PENDING</td></tr>
+        </tbody></table></div>
+      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">At a few thousand items per user a full-partition query is well within limits. If a user ever grows very large, a date-sortable key such as <code>EXPENSE#&lt;isoDate&gt;#&lt;uuid&gt;</code> would allow range queries.</p>
+
+      <h3>S3 receipts</h3>
+      <div class="fig-frame"><div class="s3path"><span>receipts/</span><span class="v">&lt;sub&gt;</span><span>/</span><span class="v">&lt;uuid&gt;</span><span>.jpg | png | webp | heic</span></div>
+        <div class="fig-cap"><span>Block-all-public-access and SSE-S3. Access only through presigned URLs scoped to the caller's prefix, valid 300 s. The PUT pins Content-Type but does not cap size.</span></div></div>
+
+      <h3>Browser storage</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Key</th><th>Where</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">CognitoIdentityServiceProvider.*</td><td>localStorage</td><td>Cognito tokens (Amplify default)</td></tr>
+          <tr><td class="mono">etp:migrated:&lt;userId&gt;</td><td>localStorage</td><td>Local → cloud migration already handled</td></tr>
+          <tr><td class="mono">etp:dashboardRange</td><td>localStorage</td><td>Last dashboard period</td></tr>
+          <tr><td class="mono">ExpenseTrackerDB</td><td>IndexedDB</td><td>Legacy pre-cloud data, read once by MigrationGate</td></tr>
+        </tbody></table></div>
+    </section>
+
+    <!-- §9 API -->
+    <section class="sec" id="api">
+      <div class="sec-h"><span class="sec-n">§9</span><h2>API reference</h2>
+        <p>JSON bodies with camelCase fields. Everything needs <code>Authorization: Bearer &lt;ID token&gt;</code> except the two routes marked public. Swagger UI runs at <code>/docs</code> locally.</p></div>
+      <div class="search"><input id="api-q" type="search" placeholder="Filter by path, method or note" aria-label="Filter endpoints"><small id="api-n"></small></div>
+      <div class="tbl-wrap"><table id="api-tbl">
+        <thead><tr><th>Method</th><th>Path</th><th>Body → response</th><th>Notes</th></tr></thead>
+        <tbody></tbody></table></div>
+      <h3>Schemas <span class="tag">models.py ⇄ types/index.ts</span></h3>
+      <div class="code"><button class="copy" type="button">Copy</button><pre><span class="h">Expense</span>        { id, date, amount, category, description, paymentMethod?, tags?, receiptUrl?, createdAt, updatedAt }
+<span class="h">ExpenseCreate</span>  { date, amount, category, description, paymentMethod?, tags?, receiptUrl? }
+<span class="h">Settings</span>       { currency = "INR", dateFormat = "DD/MM/YYYY", theme = "system", locale = "en-IN" }
+<span class="h">Budget</span>         { category, monthlyLimit?, yearlyLimit?, budgetType = "monthly"|"yearly", alertThreshold = 80, isActive = true }
+<span class="h">SavingsEntry</span>   { id, date, amount, category, description, account?, interestRate?, maturityDate?, isRecurring?, tags?, createdAt, updatedAt }
+<span class="h">SavingsGoal</span>    { id, name, targetAmount, currentAmount, deadline?, category, priority = "low"|"medium"|"high"|"critical", isActive, createdAt }
+
+<span class="c"># paymentMethod: cash | card | upi | netbanking | cheque | other
+# category is a free string on the API; the 81-value CategoryType union lives only in the frontend
+# no bulk endpoints: imports and restores fan out to single calls, 5 at a time (mapWithConcurrency)</span></pre></div>
+    </section>
+
+    <!-- §10 stack -->
+    <section class="sec" id="stack">
+      <div class="sec-h"><span class="sec-n">§10</span><h2>Tech stack</h2>
+        <p>What each layer is built with, and the one detail about it most likely to matter.</p></div>
+      <div class="grid3">
+        <div class="stack-col"><h4>Frontend</h4><dl>
+          <div class="row"><dt>React 19 + TypeScript 6</dt><dd>Single page, sections are tab state</dd></div>
+          <div class="row"><dt>Vite<small>8</small></dt><dd><code>build:aws</code> builds for CloudFront (base <code>/</code>)</dd></div>
+          <div class="row"><dt>Tailwind CSS<small>v4</small></dt><dd>Ledger tokens as CSS variables</dd></div>
+          <div class="row"><dt>Fraunces · Karla · JetBrains Mono</dt><dd>Display, body, figures</dd></div>
+          <div class="row"><dt>framer-motion<small>12</small></dt><dd>Transitions, toasts, dialogs</dd></div>
+          <div class="row"><dt>Recharts 3 · D3 7</dt><dd>LedgerLineChart is hand-built with D3</dd></div>
+          <div class="row"><dt>three.js + R3F + drei</dt><dd>3D walkthrough, lazy-loaded</dd></div>
+          <div class="row"><dt>AWS Amplify<small>v6</small></dt><dd>Auth client only, no Amplify backend</dd></div>
+          <div class="row"><dt>papaparse · xlsx · jsPDF · modern-screenshot</dt><dd>Import, export, PDF, dashboard snapshot</dd></div>
+          <div class="row"><dt>date-fns 4 · idb</dt><dd>Dates; legacy IndexedDB for migration</dd></div>
+        </dl></div>
+        <div class="stack-col"><h4>Backend</h4><dl>
+          <div class="row"><dt>Python<small>3.12</small></dt><dd>Lambda x86_64, 256 MB, 15 s timeout</dd></div>
+          <div class="row"><dt>FastAPI<small>0.115</small></dt><dd>Same app locally under uvicorn</dd></div>
+          <div class="row"><dt>Pydantic<small>2</small></dt><dd>camelCase models mirroring the TS types</dd></div>
+          <div class="row"><dt>Mangum<small>0.19</small></dt><dd>HTTP API events ⇄ ASGI</dd></div>
+          <div class="row"><dt>boto3</dt><dd>DynamoDB resource API, S3 presigned URLs</dd></div>
+          <div class="row"><dt>python-multipart</dt><dd>Parses Twilio's form-encoded webhook</dd></div>
+        </dl></div>
+        <div class="stack-col"><h4>Infrastructure</h4><dl>
+          <div class="row"><dt>AWS CDK v2<small>aws-cdk-lib 2.170.0</small></dt><dd>Python; CLI from npm</dd></div>
+          <div class="row"><dt>API Gateway HTTP API</dt><dd>v2, Cognito JWT authorizer</dd></div>
+          <div class="row"><dt>Lambda</dt><dd>One function, the whole API</dd></div>
+          <div class="row"><dt>DynamoDB</dt><dd>Single table, on-demand, TTL</dd></div>
+          <div class="row"><dt>S3 + CloudFront</dt><dd>Site with OAC; receipts with presigned URLs</dd></div>
+          <div class="row"><dt>Cognito</dt><dd>User pool + Google and Facebook</dd></div>
+          <div class="row"><dt>Secrets Manager</dt><dd>Resolved at deploy time</dd></div>
+          <div class="row"><dt>CloudWatch → SNS</dt><dd>Alarms by email</dd></div>
+          <div class="row"><dt>Twilio WhatsApp</dt><dd>Trial sender, webhook on the API</dd></div>
+        </dl></div>
+      </div>
+    </section>
+
+    <!-- §11 config -->
+    <section class="sec" id="config">
+      <div class="sec-h"><span class="sec-n">§11</span><h2>Config &amp; secrets</h2>
+        <p>Secrets are read at deploy time, so after changing one you redeploy the stack that uses it. Everything else is hard-coded in a few known places.</p></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Secret (Secrets Manager)</th><th>Contents</th><th>Consumed by</th><th>After rotating</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">expense-track-pro/google-oauth-client-secret</td><td>Google OAuth client secret</td><td>Auth stack · Google IdP</td><td class="mono">cdk deploy ExpenseTrack-Auth-dev</td></tr>
+          <tr><td class="mono">expense-track-pro/facebook-app-secret</td><td>Facebook app secret</td><td>Auth stack · Facebook IdP</td><td class="mono">cdk deploy ExpenseTrack-Auth-dev</td></tr>
+          <tr><td class="mono">expense-track-pro/twilio-auth-token</td><td>Twilio Auth Token <span class="status st-warn">placeholder today</span></td><td>Api stack · Lambda env</td><td class="mono">cdk deploy ExpenseTrack-Api-dev</td></tr>
+        </tbody></table></div>
+      <div class="code" style="margin-top:12px"><button class="copy" type="button">Copy</button><pre>aws secretsmanager put-secret-value --region ap-southeast-2 \
+  --secret-id expense-track-pro/twilio-auth-token --secret-string '&lt;value&gt;'</pre></div>
+
+      <h3>Keep the origin lists in sync</h3>
+      <p class="muted" style="max-width:75ch;margin-bottom:12px;font-size:14.5px">Allowed today: <code>http://localhost:5173</code>, <code>http://localhost:5193</code> and the CloudFront URL. A new origin, such as a custom domain, has to be added in all five places.</p>
+      <div class="grid3" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))">
+        <div class="card"><span class="why">Cognito</span><h4 class="mono" style="font-size:12.5px">auth_stack.py</h4><p>callback + sign-out URLs</p></div>
+        <div class="card"><span class="why">API Gateway</span><h4 class="mono" style="font-size:12.5px">api_stack.py</h4><p>HTTP API CORS</p></div>
+        <div class="card"><span class="why">FastAPI</span><h4 class="mono" style="font-size:12.5px">api/main.py</h4><p>CORSMiddleware (local)</p></div>
+        <div class="card"><span class="why">S3</span><h4 class="mono" style="font-size:12.5px">data_stack.py</h4><p>receipts bucket CORS</p></div>
+        <div class="card"><span class="why">Frontend</span><h4 class="mono" style="font-size:12.5px">config/amplify.ts</h4><p>OAuth redirect URLs</p></div>
+      </div>
+
+      <h3>Hard-coded values</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Value</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>Google client id</td><td class="mono">auth_stack.py → GOOGLE_OAUTH_CLIENT_ID</td></tr>
+          <tr><td>Facebook app id 1413826136840708, Graph API v17.0</td><td class="mono">auth_stack.py → FACEBOOK_APP_ID, api_version</td></tr>
+          <tr><td>Twilio WhatsApp number</td><td class="mono">api_stack.py → TWILIO_WHATSAPP_NUMBER</td></tr>
+          <tr><td>Alert email</td><td class="mono">app.py (ALERT_EMAIL overrides)</td></tr>
+          <tr><td>User pool id, client id, OAuth domain</td><td class="mono">frontend/src/config/amplify.ts</td></tr>
+          <tr><td>API base URL</td><td class="mono">frontend/src/services/cloudApi.ts → API_BASE_URL</td></tr>
+        </tbody></table></div>
+
+      <h3>External consoles</h3>
+      <div class="grid3">
+        <div class="card"><span class="why">Google Cloud</span><h4>OAuth client</h4><p>Authorized redirect URI: <code style="white-space:normal;word-break:break-all">https://expense-track-pro-dev.auth.ap-southeast-2.amazoncognito.com/oauth2/idpresponse</code></p></div>
+        <div class="card"><span class="why">Meta for Developers</span><h4>App 1413826136840708</h4><p>Same <code>/oauth2/idpresponse</code> redirect. Under Use cases → Facebook Login → Permissions, add <code>email</code>, or logins fail with “Invalid Scopes: email”.</p></div>
+        <div class="card"><span class="why">Twilio</span><h4>WhatsApp trial sender</h4><p>“When a message comes in”: <code>POST &lt;ApiUrl&gt;/whatsapp/webhook</code>. Up to 5 verified numbers on the trial.</p></div>
+      </div>
+    </section>
+
+    <!-- §12 local -->
+    <section class="sec" id="local">
+      <div class="sec-h"><span class="sec-n">§12</span><h2>Local development</h2>
+        <p>Needs Node.js 20+, Python 3.12+, and the AWS CLI v2 for deploys. Pick the mode that matches the work.</p></div>
+      <div class="tabs" role="tablist" id="mode-tabs">
+        <button class="tab" role="tab" aria-selected="true" data-mode="A" id="mode-A">A · UI against dev backend</button>
+        <button class="tab" role="tab" aria-selected="false" data-mode="B" id="mode-B">B · API locally</button>
+        <button class="tab" role="tab" aria-selected="false" data-mode="C" id="mode-C">C · Seed data</button>
+      </div>
+      <div class="mode" data-panel="A">
+        <p class="note">The deployed API and Cognito already allow <code>http://localhost:5173</code>, so no backend setup is needed. You sign in with a real account and read and write real <b>dev</b> data.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre>cd frontend
+npm install
+npm run dev:aws        <span class="c"># http://localhost:5173/ — root path matches the Cognito callback URLs</span></pre></div>
+        <p class="callout">Use <code>dev:aws</code>, not <code>dev</code>. Plain <code>dev</code> serves under <code>/ExpenseTrack-Pro/</code>, so a Google or Facebook redirect back to <code>localhost:5173/</code> misses the app.</p>
+      </div>
+      <div class="mode" data-panel="B" hidden>
+        <p class="note">FastAPI under uvicorn against a local DynamoDB. boto3 honours <code>AWS_ENDPOINT_URL_DYNAMODB</code>, so no code changes are needed.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="c"># 1) local DynamoDB (or: pip install "moto[server]" &amp;&amp; moto_server -p 8001)</span>
+docker run -d -p 8001:8000 amazon/dynamodb-local
+
+<span class="c"># 2) fake credentials, point boto3 at it</span>
+export AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_DEFAULT_REGION=ap-southeast-2
+export AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8001
+
+<span class="c"># 3) same key schema as the CDK table</span>
+aws dynamodb create-table --endpoint-url http://localhost:8001 \
+  --table-name expense-track-pro-local \
+  --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --billing-mode PAY_PER_REQUEST
+
+<span class="c"># 4) run the API</span>
+cd backend/api
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt uvicorn
+TABLE_NAME=expense-track-pro-local STAGE=dev uvicorn main:app --reload --port 8000</pre></div>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="c"># X-Local-User-Id stands in for a signed-in user (never accepted in prod)</span>
+curl localhost:8000/health
+curl -H "X-Local-User-Id: test-user" localhost:8000/expenses
+curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json" \
+  -d '{"date":"2026-10-09T00:00:00Z","amount":250,"category":"grocery","description":"Weekly groceries"}' \
+  localhost:8000/expenses</pre></div>
+        <p class="callout">The frontend can't point at the local API as-is: it always sends a Cognito token to the hard-coded <code>API_BASE_URL</code>. Use mode A for UI work and mode B for API work. Receipts need a real bucket; the webhook needs a token and a correctly signed request.</p>
+      </div>
+      <div class="mode" data-panel="C" hidden>
+        <p class="note"><code>frontend/sample-backup-2-years.json</code> is a two-year backup for a fictional Pune family: about 1,560 expenses across 80 categories and 18 budgets, Oct 2024 to Oct 2026.</p>
+        <div class="pipe"><span class="pp">☰ menu</span><span class="arr">→</span><span class="pp">Backup &amp; restore</span><span class="arr">→</span><span class="pp">Select backup file</span><span class="arr">→</span><span class="pp warn">Merge or Replace</span></div>
+        <p class="note">CSV, Excel and JSON samples for <b>☰ → Import expenses</b> are in <code>frontend/</code> as <code>sample-expenses*.csv</code> and <code>sample-expenses.json</code>.</p>
+      </div>
+    </section>
+
+    <!-- §13 deploy -->
+    <section class="sec" id="deploy">
+      <div class="sec-h"><span class="sec-n">§13</span><h2>Test &amp; deploy</h2>
+        <p>No automated test suite yet. Deploys are CDK change sets; a failed stack update rolls back automatically.</p></div>
+      <h3 style="margin-top:0">Routine frontend release</h3>
+      <div class="pipe">
+        <span class="pp">npm run build:aws</span><span class="arr">→</span>
+        <span class="pp">frontend/dist-aws</span><span class="arr">→</span>
+        <span class="pp warn">cdk diff</span><span class="arr">→</span>
+        <span class="pp">cdk deploy ExpenseTrack-Frontend-dev --exclusively</span><span class="arr">→</span>
+        <span class="pp">S3 sync + CloudFront /* invalidation</span>
+      </div>
+      <h3>What to deploy when</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>You changed</th><th>Run</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend code</td><td class="mono">npm run build:aws → cdk deploy ExpenseTrack-Frontend-dev --exclusively</td></tr>
+          <tr><td>API code or dependencies</td><td class="mono">cdk deploy ExpenseTrack-Api-dev --exclusively</td></tr>
+          <tr><td>Cognito or IdP settings</td><td class="mono">cdk deploy ExpenseTrack-Auth-dev --exclusively</td></tr>
+          <tr><td>Table or bucket settings</td><td class="mono">cdk deploy ExpenseTrack-Data-dev --exclusively</td></tr>
+          <tr><td>Alarms</td><td class="mono">cdk deploy ExpenseTrack-Monitoring-dev --exclusively</td></tr>
+          <tr><td>A secret's value</td><td class="mono">put-secret-value, then redeploy the stack that uses it</td></tr>
+        </tbody></table></div>
+      <p class="callout ember" style="margin-top:12px"><b>Watch for replacements in Auth and Data.</b> A new user pool means every user signs up again; a replaced table loses its data outside prod. If <code>cdk diff</code> shows <code>[-]/[+]</code> with “replace”, stop and rethink.</p>
+
+      <h3>First-time setup</h3>
+      <ol class="firsttime">
+        <li><b>AWS access</b><p><code>aws login --region ap-southeast-2</code>, or an IAM key limited to <code>sts:AssumeRole</code> on <code>cdk-hnb659fds-*</code> plus <code>secretsmanager:*Secret*</code> on <code>expense-track-pro/*</code>. Check with <code>aws sts get-caller-identity</code>.</p></li>
+        <li><b>Install tools</b><p><code>npm i -g aws-cdk</code>, then a venv in <code>backend/cdk</code> with <code>pip install -r requirements.txt</code>.</p></li>
+        <li><b>Bootstrap CDK</b><p><code>cdk bootstrap aws://&lt;account&gt;/ap-southeast-2</code>, once per account and Region.</p></li>
+        <li><b>Create the three secrets</b><p>The Auth and Api stacks fail to deploy without them (see §11).</p></li>
+        <li><b>Build the frontend</b><p><code>cd frontend &amp;&amp; npm ci &amp;&amp; npm run build:aws</code>. The Frontend stack uploads <code>dist-aws</code>.</p></li>
+        <li><b>Deploy everything</b><p><code>cdk deploy --all</code> for dev, or add <code>-c stage=prod</code> for a separate prod copy.</p></li>
+        <li><b>Wire up the outputs</b><p>For a new pool or API, update <code>amplify.ts</code>, <code>API_BASE_URL</code> and the origin lists, then redeploy the Frontend stack.</p></li>
+        <li><b>External consoles</b><p>Add the <code>/oauth2/idpresponse</code> URL in Google and Facebook, add the Facebook <code>email</code> permission, set the Twilio webhook.</p></li>
+        <li><b>Confirm the SNS subscription</b><p>Click the link in AWS's email, or alarms are never delivered.</p></li>
+      </ol>
+
+      <h3>Checks</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Check</th><th>Command</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Production build</td><td class="mono">npm run build:aws</td><td><span class="status st-ok">must pass</span></td></tr>
+          <tr><td>CDK synth</td><td class="mono">cdk synth</td><td><span class="status st-ok">must pass</span> needs dist-aws</td></tr>
+          <tr><td>Type check</td><td class="mono">npx tsc -b</td><td><span class="status st-warn">~24 old errors</span></td></tr>
+          <tr><td>Lint</td><td class="mono">npm run lint</td><td><span class="status st-warn">~70 old errors</span></td></tr>
+          <tr><td>Deployed smoke test</td><td class="mono">curl &lt;ApiUrl&gt;/health → ok · /expenses → 401</td><td><span class="status st-ok">manual</span></td></tr>
+          <tr><td>Release checklist</td><td>sign-up, OAuth, CRUD, dashboard periods, PDFs, backup, receipts, WhatsApp, phone + dark mode</td><td><span class="status st-ok">manual</span></td></tr>
+        </tbody></table></div>
+      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">Next steps: pytest with FastAPI TestClient and moto for the backend, Vitest for <code>period.ts</code> and backup validation, Playwright end to end, and a GitHub Actions workflow running build, lint, tests and <code>cdk synth</code>.</p>
+    </section>
+
+    <!-- §14 ops -->
+    <section class="sec" id="ops">
+      <div class="sec-h"><span class="sec-n">§14</span><h2>Monitoring</h2>
+        <p>Five alarms on SNS topic <code>expense-track-pro-alerts-&lt;stage&gt;</code>, delivered by email. Missing data counts as not breaching, so quiet periods stay quiet.</p></div>
+      <div class="alarms">
+        <div class="alarm"><b>LambdaErrorsAlarm</b><span>Lambda Errors · Sum over 5 min</span><span class="status st-bad">≥ 1</span></div>
+        <div class="alarm"><b>LambdaThrottlesAlarm</b><span>Lambda Throttles · Sum over 5 min</span><span class="status st-bad">≥ 1</span></div>
+        <div class="alarm"><b>ApiServerErrorAlarm</b><span>HTTP API 5xx · Sum over 5 min</span><span class="status st-bad">≥ 1</span></div>
+        <div class="alarm"><b>ApiHighLatencyAlarm</b><span>HTTP API Latency · p99 over 5 min</span><span class="status st-bad">≥ 3000 ms × 2</span></div>
+        <div class="alarm"><b>TableThrottledRequestsAlarm</b><span>DynamoDB throttled requests · Sum over 5 min</span><span class="status st-bad">≥ 1</span></div>
+      </div>
+      <div class="code" style="margin-top:14px"><button class="copy" type="button">Copy</button><pre>aws logs tail /aws/lambda/&lt;ApiFunctionName&gt; --follow --region ap-southeast-2   <span class="c"># FastAPI tracebacks for any 500</span></pre></div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="card"><h4>Cost</h4><p>Everything is pay-per-use, so an idle stage costs close to nothing. Watch Secrets Manager (about $0.40 per secret per month), Cognito MAUs past the free tier, and Twilio once off the trial.</p></div>
+        <div class="card"><h4>Account constraints</h4><p>Regional resources must be in ap-southeast-2: no Lambda@Edge, StackSets or cross-Region replication. Sudden <code>AccessDenied</code> usually means the project's spend limit was hit.</p></div>
+      </div>
+    </section>
+
+    <!-- §15 trouble -->
+    <section class="sec" id="trouble">
+      <div class="sec-h"><span class="sec-n">§15</span><h2>Troubleshooting</h2>
+        <p>Symptoms seen on this project, with the cause and the fix.</p></div>
+      <div class="search"><input id="ts-q" type="search" placeholder="Filter, e.g. 401, CORS, WhatsApp" aria-label="Filter troubleshooting entries"><small id="ts-n"></small></div>
+      <div class="ts" id="ts-list"></div>
+    </section>
+
+    <!-- §16 debt -->
+    <section class="sec" id="debt">
+      <div class="sec-h"><span class="sec-n">§16</span><h2>Known limits &amp; tech debt</h2>
+        <p>What to fix before a real launch.</p></div>
+      <ul class="debt">
+        <li>No automated tests or CI.</li>
+        <li>Old TypeScript and ESLint errors; <code>npm run build</code> fails, <code>build:aws</code> skips the type check.</li>
+        <li>Pool ids and API URL are hard-coded instead of injected per stage with <code>import.meta.env</code>.</li>
+        <li>Cognito's default sender is capped at 50 emails a day; move to SES.</li>
+        <li>Tokens live in localStorage. Consider cookie storage, shorter lifetimes and refresh-token rotation.</li>
+        <li>No GSIs or date-sorted keys; loading a ledger is a full-partition query.</li>
+        <li>Receipt uploads aren't size-limited or checked after upload.</li>
+        <li>WhatsApp runs on Twilio's trial sender (5 numbers), and the real Auth Token isn't stored yet.</li>
+        <li>No custom domain; the site uses the CloudFront default.</li>
+        <li>Old GitHub Pages scripts and the <code>/ExpenseTrack-Pro/</code> base path still exist.</li>
+      </ul>
+      <footer>ExpenseTrack Pro · drawn from the repository README (commit 2524066) and source, October 2026.</footer>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+function S(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function T(parent,x,y,str,cls,anchor){const t=S('text',{x:x,y:y,class:cls||'','text-anchor':anchor||'start'},parent);t.textContent=str;return t;}
+function lines(parent,x,y,str,cls,anchor,lh){String(str).split('\n').forEach(function(l,i){T(parent,x,y+i*(lh||13),l,cls,anchor);});}
+function markers(svg,id,cls){const d=S('defs',{},svg);const m=S('marker',{id:id,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto-start-reverse'},d);S('path',{d:'M0,0 L10,5 L0,10 z',class:cls},m);return d;}
+
+/* ───────── §1 HLD ───────── */
+const HN=[
+ {id:'browser',x:30,y:170,w:180,h:170,t:'Browser',sub:['React 19 SPA','Amplify Auth v6','cloudApi.ts'],tier:'client',
+  k:'Client · frontend/',d:'The single-page app, served from CloudFront. Amplify keeps the Cognito session; services/cloudApi.ts is the only HTTP client and attaches the ID token to every call.',
+  pts:['Sections are tab state in App.tsx (no router)','Uploads receipts straight to S3 with presigned URLs','Provider chain: ErrorBoundary → Toast → Confirm → AuthGate → MigrationGate → App'],files:['main.tsx','App.tsx','services/cloudApi.ts','config/amplify.ts']},
+ {id:'phone',x:30,y:580,w:180,h:52,t:"User's WhatsApp",sub:['“450 dinner zomato”'],tier:'client',
+  k:'Client · messaging',d:'After a one-time link, a user can text an expense to the app number and it lands in their ledger.',
+  pts:['Link once: “LINK <code>” with a 6-character code from the app','Then any message with an amount, e.g. “150 auto”','The phone must first join the Twilio trial sender'],files:['components/whatsapp/']},
+ {id:'cf',x:290,y:80,w:180,h:60,t:'CloudFront',sub:['d3bttra9tv41h7 · OAC'],tier:'aws',
+  k:'Frontend stack',d:'CDN for the built SPA. Origin Access Control means only CloudFront can read the site bucket.',
+  pts:['HTTP → HTTPS redirect','403/404 → /index.html (SPA fallback)','Every Frontend deploy invalidates /*'],files:['stacks/frontend_stack.py']},
+ {id:'s3site',x:520,y:80,w:180,h:60,t:'S3 site bucket',sub:['private · dist-aws'],tier:'data',
+  k:'Frontend stack',d:'expense-track-pro-site-dev-<account>. Filled by a BucketDeployment of frontend/dist-aws.',
+  pts:['Block all public access','Auto-emptied and deleted outside prod'],files:['stacks/frontend_stack.py']},
+ {id:'cognito',x:290,y:200,w:180,h:72,t:'Cognito user pool',sub:['ap-southeast-2_f6zD79Um0','hosted OAuth domain'],tier:'aws',
+  k:'Auth stack',d:'Email sign-in with SRP, self sign-up with a branded 6-digit code, and federation with Google and Facebook through the hosted domain.',
+  pts:['Public SPA client 4m6v1tcr…, no secret','Password: 8+ chars, upper, lower, digit','Default email sender: 50 emails a day'],files:['stacks/auth_stack.py','hooks/useAuth.ts','components/auth/AuthCard.tsx']},
+ {id:'secrets',x:520,y:200,w:180,h:64,t:'Secrets Manager',sub:['3 secrets · deploy-time'],tier:'aws',
+  k:'Created by hand, once per account',d:'Google secret, Facebook secret and the Twilio Auth Token. CDK only emits {{resolve:secretsmanager:…}} references; CloudFormation resolves them during deploy.',
+  pts:['Values never appear in git or templates','Rotate with put-secret-value, then redeploy the consumer stack','The Twilio token is still a placeholder'],files:['stacks/auth_stack.py','stacks/api_stack.py']},
+ {id:'apigw',x:290,y:360,w:180,h:72,t:'API Gateway',sub:['HTTP API v2','Cognito JWT authorizer'],tier:'aws',
+  k:'Api stack · hbsqcepav7',d:'Verifies the ID token (signature, issuer = pool, audience = client) before Lambda runs. Bad or missing token returns 401 from the gateway.',
+  pts:['/{proxy+} behind the authorizer','/health and /whatsapp/webhook are public literal routes','CORS preflight answered by the gateway; OPTIONS not routed'],files:['stacks/api_stack.py']},
+ {id:'lambda',x:520,y:360,w:180,h:72,t:'Lambda',sub:['FastAPI + Mangum','py3.12 · 256 MB · 15 s'],tier:'aws',
+  k:'Api stack · backend/api/',d:'One function runs the whole FastAPI app. It reads the already-verified sub claim and never validates tokens itself.',
+  pts:['7 routers: health, expenses, settings, budgets, savings, receipts, whatsapp','Presigns S3 URLs; files never pass through it','Bundled without Docker (manylinux wheels)'],files:['lambda_handler.py','main.py','dependencies/auth.py','db.py']},
+ {id:'receipts',x:750,y:272,w:180,h:64,t:'S3 receipts',sub:['receipts/<sub>/<uuid>'],tier:'data',
+  k:'Data stack',d:'Private bucket for receipt photos, SSE-S3 encrypted. The browser reads and writes only with 300-second presigned URLs scoped to its own prefix.',
+  pts:['jpeg, png, webp or heic only','View URL is refused (403) outside the caller’s prefix','No size cap yet'],files:['stacks/data_stack.py','routers/receipts.py']},
+ {id:'ddb',x:750,y:384,w:180,h:64,t:'DynamoDB',sub:['single table · PK / SK'],tier:'data',
+  k:'Data stack · expense-track-pro-dev',d:'One table, on-demand, TTL on the ttl attribute. Everything a user owns is in partition USER#<sub>; no secondary indexes.',
+  pts:['Load ledger = one paginated Query','WhatsApp links stored in both directions','PITR enabled in prod only'],files:['stacks/data_stack.py','db.py']},
+ {id:'cw',x:520,y:530,w:180,h:56,t:'CloudWatch',sub:['5 alarms · λ · API · table'],tier:'ops',
+  k:'Monitoring stack',d:'Watches Lambda errors and throttles, API 5xx and p99 latency, and DynamoDB throttling.',
+  pts:['Each alarm fires on ≥ 1 in 5 minutes, latency on ≥ 3 s twice','Missing data is not breaching'],files:['stacks/monitoring_stack.py']},
+ {id:'sns',x:750,y:530,w:180,h:56,t:'SNS topic',sub:['→ alert email'],tier:'ops',
+  k:'Monitoring stack',d:'expense-track-pro-alerts-dev with one email subscription.',
+  pts:['Confirm the subscription email once, or nothing is delivered','ALERT_EMAIL env var overrides the address'],files:['stacks/monitoring_stack.py','app.py']},
+ {id:'google',x:1000,y:190,w:155,h:48,t:'Google',sub:['openid email profile'],tier:'ext',
+  k:'Identity provider',d:'Federated into the same user pool. Cognito brokers the OAuth dance; the app calls signInWithRedirect({provider: "Google"}).',
+  pts:['Redirect URI: <cognito domain>/oauth2/idpresponse','Maps email and name'],files:['stacks/auth_stack.py']},
+ {id:'facebook',x:1000,y:250,w:155,h:48,t:'Facebook',sub:['Graph API v17.0'],tier:'ext',
+  k:'Identity provider · app 1413826136840708',d:'Federated like Google. Cognito only accepts Graph API versions on its own allowlist; v17.0 works.',
+  pts:['Scopes public_profile and email','The email permission must be added under Use cases'],files:['stacks/auth_stack.py']},
+ {id:'twilio',x:1000,y:460,w:155,h:64,t:'Twilio WhatsApp',sub:['trial sender'],tier:'ext',
+  k:'Messaging',d:'Forwards each incoming WhatsApp message to /whatsapp/webhook as a form post signed with X-Twilio-Signature, and relays the TwiML reply.',
+  pts:['Trial: up to 5 verified numbers','Production sender needs Meta business verification'],files:['routers/whatsapp.py']}
+];
+const HE=[
+ {f:'browser',t:'cf',d:'M210,192 H250 V110 H286',l:'assets',lx:250,ly:152},
+ {f:'browser',t:'cognito',d:'M210,236 H286',both:1,l:'SRP · OAuth',lx:250,ly:236},
+ {f:'browser',t:'apigw',d:'M210,318 H250 V396 H286',l:'Bearer JWT',lx:250,ly:360},
+ {f:'browser',t:'receipts',d:'M210,296 H746',both:1,l:'PUT / GET via presigned URL',lx:395,ly:296},
+ {f:'cf',t:'s3site',d:'M470,110 H516',l:'OAC',lx:493,ly:110},
+ {f:'cognito',t:'google',d:'M470,214 H492 V160 H975 V214 H996',l:'OAuth federation',lx:735,ly:160},
+ {f:'cognito',t:'facebook',d:'M975,214 V274 H996'},
+ {f:'secrets',t:'cognito',d:'M518,240 H474',dash:1,l:'deploy',lx:496,ly:240},
+ {f:'secrets',t:'lambda',d:'M610,264 V356',dash:1,l:'deploy',lx:610,ly:340},
+ {f:'apigw',t:'cognito',d:'M380,356 V276',dash:1,l:'JWKS',lx:380,ly:330},
+ {f:'apigw',t:'lambda',d:'M470,396 H516',l:'claims',lx:493,ly:396},
+ {f:'lambda',t:'receipts',d:'M670,360 V320 H746',l:'presign',lx:708,ly:320},
+ {f:'lambda',t:'ddb',d:'M700,410 H746',l:'boto3',lx:723,ly:410},
+ {f:'twilio',t:'apigw',d:'M996,492 H400 V435',l:'POST /whatsapp/webhook · X-Twilio-Signature',lx:690,ly:492},
+ {f:'phone',t:'twilio',d:'M210,606 H1077 V528',both:1,l:'“LINK QQ9HON” · “150 auto”',lx:600,ly:606},
+ {f:'cw',t:'sns',d:'M700,558 H746'}
+];
+(function(){
+ const svg=document.getElementById('hld-svg');markers(svg,'hah','ah');
+ [{x:10,y:36,w:232,h:606,l:'CLIENTS',c:'z-client'},{x:262,y:36,w:700,h:606,l:'AWS · AP-SOUTHEAST-2 (SYDNEY)',c:'z-aws'},{x:980,y:36,w:190,h:606,l:'THIRD PARTIES',c:'z-ext'}]
+  .forEach(function(z){S('rect',{x:z.x,y:z.y,width:z.w,height:z.h,rx:14,class:'z '+z.c},svg);T(svg,z.x+14,z.y+22,z.l,'z-label');});
+ const eg=S('g',{},svg),lg=S('g',{},svg),ng=S('g',{},svg);
+ HE.forEach(function(e,i){
+   const p=S('path',{d:e.d,class:'edge'+(e.dash?' dash':''),'marker-end':'url(#hah)'},eg);
+   if(e.both)p.setAttribute('marker-start','url(#hah)');
+   e.el=p;
+   if(e.l){e.lab=T(lg,e.lx,e.ly+3.5,e.l,'e-label','middle');}
+ });
+ HN.forEach(function(n){
+   const g=S('g',{class:'node t-'+n.tier,tabindex:'0',role:'button','aria-label':n.t},ng);
+   S('rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:10},g);
+   S('circle',{cx:n.x+n.w-14,cy:n.y+16,r:4,class:'pip'},g);
+   T(g,n.x+14,n.y+(n.h<60?22:25),n.t,'n-title');
+   n.sub.forEach(function(s,i){T(g,n.x+14,n.y+(n.h<60?38:43)+i*16,s,'n-sub');});
+   n.el=g;
+   g.addEventListener('click',function(){pick(n.id);});
+   g.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();pick(n.id);}});
+ });
+ const det=document.getElementById('hld-detail');
+ function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+ function pick(id,quiet){
+   const n=HN.find(function(x){return x.id===id;});
+   svg.classList.toggle('hot',!quiet);
+   const linked=new Set([id]);
+   HE.forEach(function(e){const on=e.f===id||e.t===id;e.el.classList.toggle('on',on);if(e.lab)e.lab.classList.toggle('on',on);if(on){linked.add(e.f);linked.add(e.t);}});
+   HN.forEach(function(x){x.el.classList.toggle('on',linked.has(x.id));x.el.classList.toggle('sel',x.id===id);});
+   const peers=[...linked].filter(function(x){return x!==id;}).map(function(x){return HN.find(function(y){return y.id===x;}).t;});
+   det.innerHTML='<div><div class="k">'+esc(n.k)+'</div><h4>'+esc(n.t)+'</h4><p class="muted" style="font-size:14.5px">'+esc(n.d)+'</p><div class="chips">'+n.files.map(function(f){return '<span class="chip pine">'+esc(f)+'</span>';}).join('')+'</div></div>'+
+     '<div><div class="k">Details</div><ul style="margin-top:8px">'+n.pts.map(function(p){return '<li>'+esc(p)+'</li>';}).join('')+'</ul>'+
+     (peers.length?'<div class="k" style="margin-top:12px">Connected to</div><div class="chips">'+peers.map(function(p){return '<span class="chip">'+esc(p)+'</span>';}).join('')+'</div>':'')+'</div>';
+ }
+ svg.addEventListener('click',function(ev){if(ev.target===svg){svg.classList.remove('hot');HN.forEach(function(x){x.el.classList.remove('sel');});}});
+ pick('apigw',true);
+})();
+
+/* ───────── §3 CDK graph ───────── */
+(function(){
+ const svg=document.getElementById('cdk-svg');markers(svg,'cah','ah');
+ const N=[{id:'auth',x:20,y:20,w:200,h:62,t:'Auth',s:'Cognito · IdPs · client'},{id:'data',x:20,y:132,w:200,h:62,t:'Data',s:'DynamoDB · receipts bucket'},
+  {id:'api',x:330,y:76,w:200,h:62,t:'Api',s:'Lambda · HTTP API'},{id:'mon',x:610,y:20,w:170,h:62,t:'Monitoring',s:'alarms → SNS'},{id:'fe',x:610,y:132,w:170,h:62,t:'Frontend',s:'S3 · CloudFront'}];
+ [['M220,51 H275 V98 H326','pool · client'],['M220,163 H275 V116 H326','table · bucket'],['M530,107 H570 V51 H606','metrics']].forEach(function(e){
+   S('path',{d:e[0],class:'edge','marker-end':'url(#cah)'},svg);});
+ T(svg,275,78,'pool · client','e-label','middle').setAttribute('style','stroke:var(--surface)');
+ T(svg,275,144,'table · bucket','e-label','middle').setAttribute('style','stroke:var(--surface)');
+ T(svg,570,82,'metrics','e-label','middle').setAttribute('style','stroke:var(--surface)');
+ N.forEach(function(n){const g=S('g',{class:'node t-'+(n.id==='mon'?'ops':n.id==='data'||n.id==='fe'?'data':'aws')},svg);g.style.cursor='default';
+  S('rect',{x:n.x,y:n.y,width:n.w,height:n.h,rx:10},g);S('circle',{cx:n.x+n.w-14,cy:n.y+16,r:4,class:'pip'},g);
+  T(g,n.x+14,n.y+25,n.t,'n-title');T(g,n.x+14,n.y+44,n.s,'n-sub');});
+ T(svg,695,212,'no dependencies','e-label','middle').setAttribute('style','stroke:var(--surface)');
+})();
+
+/* ───────── §6 Sequence flows ───────── */
+const FLOWS=[
+ {id:'call',tab:'Authenticated API call',title:'An authenticated API call',
+  sum:'Loading the ledger. The authorizer rejects bad tokens at the edge, so the Lambda only ever reads the sub claim.',
+  where:['services/cloudApi.ts','api_stack.py authorizer','dependencies/auth.py','routers/expenses.py'],gap:190,
+  p:[['B','Browser','cloudApi.ts'],['A','Amplify','aws-amplify/auth'],['G','API Gateway','JWT authorizer'],['L','Lambda','FastAPI'],['D','DynamoDB','single table']],
+  s:[['B','A','fetchAuthSession()'],['A','B','ID token (refreshed if expired)',1],['B','G','GET /expenses\nAuthorization: Bearer <idToken>'],['G','G','verify signature,\niss = pool, aud = client'],
+     ['note','G','L','Invalid or missing token → 401 here; the Lambda never runs'],['G','L','event + authorizer.jwt.claims'],['L','L','Mangum → FastAPI\nget_user_id() = claims.sub'],
+     ['L','D','Query PK = USER#sub\nbegins_with(SK, "EXPENSE#")'],['D','L','items (paginated)',1],['L','B','200 Expense[] (camelCase JSON)',1],['B','B','ISO strings → Date']]},
+ {id:'signup',tab:'Email sign-up',title:'Email sign-up and verification',
+  sum:'Everything happens in the in-app AuthCard. Cognito sends the branded 6-digit code; autoSignIn skips a second password prompt.',
+  where:['components/auth/AuthCard.tsx','hooks/useAuth.ts','auth_stack.py user_verification'],gap:190,
+  p:[['U','AuthCard','in-app UI'],['A','Amplify','aws-amplify/auth'],['C','Cognito','user pool'],['E','Inbox','user email']],
+  s:[['U','A','signUp({ email, password,\nautoSignIn: true })'],['A','C','SignUp'],['C','E','“Your ExpenseTrack Pro\nverification code”'],['C','A','next step: CONFIRM_SIGN_UP',1],
+     ['U','A','confirmSignUp(code)'],['A','C','ConfirmSignUp'],['C','A','confirmed',1],['U','A','autoSignIn()'],['A','C','SRP sign-in'],['C','A','ID, access, refresh tokens',1],
+     ['A','A','Hub “signedIn”\n→ useAuth.refresh()'],['note','U','C','AuthGate swaps the landing page for MigrationGate → App']]},
+ {id:'oauth',tab:'Google / Facebook',title:'Google or Facebook sign-in',
+  sum:'Cognito’s hosted domain is used only as the OAuth broker; its pages are never shown. Amplify finishes the code exchange when the app reloads.',
+  where:['AuthCard.tsx signInWithRedirect','config/amplify.ts redirectSignIn','hooks/useAuth.ts'],gap:200,
+  p:[['B','Browser','AuthCard'],['A','Amplify','on reload'],['C','Cognito','/oauth2/*'],['P','Google / Facebook','provider']],
+  s:[['B','C','signInWithRedirect({ provider })\n→ /oauth2/authorize?identity_provider=…'],['C','P','redirect to provider consent'],['P','C','/oauth2/idpresponse?code=…',1],
+     ['C','C','map email, name\n→ pool user'],['C','B','redirect to app callback ?code=…',1],['B','A','app boots, Amplify sees the code'],
+     ['A','C','POST /oauth2/token\n(code + PKCE verifier)'],['C','A','tokens',1],['A','A','Hub “signInWithRedirect”\nor “…_failure” → error on card']]},
+ {id:'wa',tab:'WhatsApp link & log',title:'Linking WhatsApp, then logging by text',
+  sum:'A one-time code ties a phone to a user, written in both directions. After that, any message with an amount becomes an expense.',
+  where:['routers/whatsapp.py','components/whatsapp/'],gap:175,
+  p:[['U','App','signed in'],['W','WhatsApp','user’s phone'],['T','Twilio','trial sender'],['L','Lambda','routers/whatsapp'],['D','DynamoDB','table']],
+  s:[['U','L','POST /whatsapp/link-code'],['L','D','put LINKCODE#QQ9HON\nPENDING, ttl +15 min'],['L','U','{ code, expiresInSeconds: 900 }',1],
+     ['W','T','“LINK QQ9HON”'],['T','L','POST /whatsapp/webhook\nform + X-Twilio-Signature'],['L','L','HMAC-SHA1 check\n(403 if bad)'],
+     ['L','D','put WHATSAPP#phone/LINK,\nUSER#sub/WHATSAPP_LINK; delete code'],['L','T','TwiML “✅ linked”',1],['T','W','reply',1],
+     ['W','T','“150 auto”'],['T','L','POST /whatsapp/webhook'],['L','D','get WHATSAPP#phone → userId\nput EXPENSE#uuid'],['L','T','TwiML “Logged ₹150 · auto rickshaw”',1],['T','W','reply',1]]},
+ {id:'receipt',tab:'Receipt upload',title:'Uploading and viewing a receipt',
+  sum:'The API only signs URLs. The bytes go straight between the browser and S3, so Lambda’s payload and timeout limits never apply.',
+  where:['routers/receipts.py','data_stack.py bucket CORS'],gap:230,
+  p:[['B','Browser','expense form'],['L','Lambda','routers/receipts'],['S','S3','receipts bucket']],
+  s:[['B','L','POST /receipts/upload-url\n{ contentType: "image/jpeg" }'],['L','L','type allowed?\nkey = receipts/<sub>/<uuid>.jpg'],['L','B','{ uploadUrl (300 s), key }',1],
+     ['B','S','PUT uploadUrl (same Content-Type)'],['S','B','200',1],['B','L','save expense with receiptUrl = key'],
+     ['note','B','S','Later, to show it'],['B','L','GET /receipts/view-url?key=…'],['L','L','key under receipts/<sub>/?\nelse 403'],['L','B','{ viewUrl (300 s) }',1],['B','S','GET viewUrl']]},
+ {id:'delete',tab:'Delete expense',title:'Deleting an expense',
+  sum:'A promise-based confirm dialog replaces window.confirm. On success the hook drops the row locally, so the list never blanks behind a spinner.',
+  where:['components/ui/ConfirmDialog.tsx','hooks/useExpenses.ts','components/ui/Toast.tsx'],gap:175,
+  p:[['U','ExpenseList','row action'],['C','useConfirm','dialog'],['H','useExpenses','hook'],['A','cloudApi','→ API'],['T','Toast','status']],
+  s:[['U','C','confirm({ title, tone: "danger" })'],['C','U','resolves true / false',1],['U','H','deleteExpense(id)'],['H','A','DELETE /expenses/{id}'],['A','H','204',1],
+     ['H','H','setExpenses(prev ⇒\nprev.filter(e ⇒ e.id ≠ id))'],['U','T','“Expense deleted”'],['note','U','T','On failure: error toast, list unchanged; the full-screen error is only for the first load']]},
+ {id:'pdf',tab:'Dashboard PDF',title:'Dashboard snapshot to PDF',
+  sum:'A picture-exact export. Fonts are inlined first, because a cross-origin stylesheet can’t be read by the renderer and text would wrap differently.',
+  where:['services/dashboardSnapshot.ts','reports/PDFReportGenerator.tsx'],gap:175,
+  p:[['U','PDF dialog','A4 or one page'],['S','dashboardSnapshot','service'],['F','Google Fonts','CSS + woff2'],['M','modern-screenshot','DOM → canvas'],['J','jsPDF','document']],
+  s:[['U','S','export({ layout })'],['S','F','fetch Fraunces, Karla,\nJetBrains Mono CSS'],['F','S','latin + latin-ext woff2\n→ data: URLs',1],['S','M','render dashboard root\nwith font.cssText'],['M','S','canvas of the live DOM',1],
+     ['S','S','cut at [data-snapshot-block]\nboundaries (or one page)'],['S','J','addImage per page'],['J','U','save PDF + toast',1]]},
+ {id:'restore',tab:'Backup restore',title:'Restoring a backup (Replace mode)',
+  sum:'There are no bulk endpoints, so a restore fans out to single calls, five at a time, reporting progress per phase.',
+  where:['services/backup.ts','services/cloudApi.ts mapWithConcurrency','backup/BackupRestore.tsx'],gap:185,
+  p:[['U','BackupRestore','dialog'],['B','backup.ts','importBackup'],['C','cloudApi','fan-out × 5'],['A','API','Lambda']],
+  s:[['U','B','parseBackupFile(file)'],['B','B','validate version,\nexportDate, data'],['U','U','confirm “Replace all?”'],
+     ['B','C','clearAllExpenses()'],['C','A','DELETE /expenses/{id} × n'],['C','U','progress “clearing”',1],['B','C','clearAllBudgets()'],
+     ['B','C','addExpenses(rows)'],['C','A','POST /expenses × n'],['C','U','progress “expenses”',1],
+     ['B','C','saveBudget() each, then settings'],['C','A','PUT /budgets/{category}, PUT /settings'],['B','U','{ expenses, budgets } imported → toast',1]]}
+];
+function renderSeq(host,f){
+ host.innerHTML='';
+ const n=f.p.length,gap=f.gap||180,ml=100,mr=Math.max(100,0);
+ const X={};f.p.forEach(function(p,i){X[p[0]]=ml+i*gap;});
+ let selfMax=0;f.s.forEach(function(s){if(s[0]===s[1]&&s[0]!=='note'){const len=Math.max.apply(null,s[2].split('\n').map(function(l){return l.length;}));selfMax=Math.max(selfMax,X[s[0]]+44+len*6.4);}});
+ const W=Math.max(ml*2+gap*(n-1),selfMax+20);
+ let y=84;const rows=[];
+ f.s.forEach(function(s){const nl=(s[0]==='note'?1:s[2].split('\n').length);const h=s[0]==='note'?40:(s[0]===s[1]?34+nl*13:24+nl*13);rows.push({s:s,y:y,h:h});y+=h+8;});
+ const H=y+16;
+ const svg=S('svg',{viewBox:'0 0 '+W+' '+H,role:'img','aria-label':f.title},host);
+ const d=S('defs',{},svg);
+ [['sa','ah-ink'],['sr','ah-pine']].forEach(function(m){const mk=S('marker',{id:m[0]+f.id,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto'},d);S('path',{d:'M0,0 L10,5 L0,10 z',class:m[1]},mk);});
+ f.p.forEach(function(p){S('line',{x1:X[p[0]],y1:56,x2:X[p[0]],y2:H-8,class:'life'},svg);});
+ f.p.forEach(function(p){const g=S('g',{class:'seq-p'},svg);const w=Math.min(gap-16,160);S('rect',{x:X[p[0]]-w/2,y:10,width:w,height:46,rx:9},g);T(g,X[p[0]],29,p[1],'pt','middle');T(g,X[p[0]],45,p[2],'ps','middle');});
+ let k=0;
+ rows.forEach(function(r){const s=r.s;
+   if(s[0]==='note'){const a=X[s[1]],b=X[s[2]];const x1=Math.min(a,b)-60,x2=Math.max(a,b)+60;S('rect',{x:x1,y:r.y,width:x2-x1,height:30,rx:6,class:'note-r'},svg);T(svg,(x1+x2)/2,r.y+19,s[3],'note-t','middle');return;}
+   k++;const nl=s[2].split('\n');const reply=!!s[3];
+   T(svg,14,r.y+nl.length*13+4,String(k).padStart(2,'0'),'sn','start');
+   if(s[0]===s[1]){const x=X[s[0]];const top=r.y+4;const bot=r.y+r.h-6;
+     S('path',{d:'M'+x+','+top+' H'+(x+30)+' V'+bot+' H'+(x+3),class:'msg','marker-end':'url(#sa'+f.id+')'},svg);
+     nl.forEach(function(l,i){T(svg,x+38,top+12+i*13,l,'mt','start');});
+   }else{const x1=X[s[0]],x2=X[s[1]];const ly=r.y+nl.length*13+8;const dir=x2>x1?1:-1;
+     S('line',{x1:x1+dir*2,y1:ly,x2:x2-dir*2,y2:ly,class:'msg'+(reply?' reply':''),'marker-end':'url(#'+(reply?'sr':'sa')+f.id+')'},svg);
+     nl.forEach(function(l,i){T(svg,(x1+x2)/2,r.y+10+i*13,l,'mt'+(reply?' reply':''),'middle');});
+   }
+ });
+}
+(function(){
+ const tabs=document.getElementById('flow-tabs'),head=document.getElementById('flow-head'),host=document.getElementById('flow-svg'),cap=document.getElementById('flow-cap');
+ function show(id){const f=FLOWS.find(function(x){return x.id===id;});
+   [].forEach.call(tabs.children,function(b){b.setAttribute('aria-selected',b.dataset.id===id?'true':'false');});
+   head.innerHTML='';const h=document.createElement('h4');h.textContent=f.title;const p=document.createElement('p');p.textContent=f.sum;head.append(h,p);
+   renderSeq(host,f);
+   cap.innerHTML='';const l=document.createElement('div');l.className='legend';l.innerHTML='<span><i class="ln-solid" style="border-color:var(--ink)"></i>call</span><span><i class="ln-dash" style="border-color:var(--pine)"></i>response</span><span><i style="background:var(--brass-soft);border:1px solid var(--brass-mid)"></i>note</span>';
+   const w=document.createElement('div');w.className='chips';w.style.margin='0';f.where.forEach(function(x){const c=document.createElement('span');c.className='chip pine';c.textContent=x;w.appendChild(c);});
+   cap.append(l,w);
+   try{localStorage.setItem('atlas:flow',id);}catch(e){}
+ }
+ FLOWS.forEach(function(f){const b=document.createElement('button');b.className='tab';b.type='button';b.setAttribute('role','tab');b.dataset.id=f.id;b.id='flow-'+f.id;b.textContent=f.tab;b.addEventListener('click',function(){show(f.id);});tabs.appendChild(b);});
+ let start='call';try{const v=localStorage.getItem('atlas:flow');if(v&&FLOWS.some(function(f){return f.id===v;}))start=v;}catch(e){}
+ show(start);
+})();
+
+/* ───────── §7 Ladders ───────── */
+function ladder(host,steps,opt){
+ opt=opt||{};const W=opt.w||640,sx=opt.sx||150,dw=opt.dw||236,rh=opt.rh||78,bx=opt.bx||330;
+ const H=steps.length*rh+10;
+ const svg=S('svg',{viewBox:'0 0 '+W+' '+H,role:'img'},host);
+ const d=S('defs',{},svg);const mk=S('marker',{id:'lm'+host.id,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto'},d);S('path',{d:'M0,0 L10,5 L0,10 z',class:'ah'},mk);
+ steps.forEach(function(s,i){const cy=i*rh+rh/2+4;const L=s.t.split('\n');
+   if(s.k==='start'||s.k==='end'){S('rect',{x:sx-dw/2,y:cy-18,width:dw,height:36,rx:18,class:s.k==='end'?(s.tone==='err'?'lx-err':'ls'):'ls'},svg);
+     L.forEach(function(l,j){T(svg,sx,cy+4-(L.length-1)*6.5+j*13,l,s.k==='end'&&s.tone==='err'?'lt':'lst','middle');});}
+   else if(s.k==='act'){S('rect',{x:sx-dw/2,y:cy-22,width:dw,height:44,rx:8,class:'la'},svg);L.forEach(function(l,j){T(svg,sx,cy+4-(L.length-1)*6.5+j*13,l,'lt','middle');});}
+   else{const hw=dw/2,hh=27;S('path',{d:'M'+(sx-hw)+','+cy+' L'+sx+','+(cy-hh)+' L'+(sx+hw)+','+cy+' L'+sx+','+(cy+hh)+' Z',class:'lq'},svg);
+     L.forEach(function(l,j){T(svg,sx,cy+4-(L.length-1)*6.5+j*13,l,'lt','middle');});}
+   if(s.x){const xL=s.x.t.split('\n');const ex=(s.k==='q'?sx+dw/2:sx+dw/2);S('path',{d:'M'+ex+','+cy+' H'+(bx-3),class:'edge','marker-end':'url(#lm'+host.id+')'},svg);
+     T(svg,(ex+bx)/2,cy-6,s.x.l,'lxl','middle');
+     const bw=W-bx-12,bh=Math.max(34,xL.length*13+16);S('rect',{x:bx,y:cy-bh/2,width:bw,height:bh,rx:8,class:'lx-'+(s.x.tone||'info')},svg);
+     xL.forEach(function(l,j){T(svg,bx+12,cy+4-(xL.length-1)*6.5+j*13,l,'lt','start');});}
+   if(i<steps.length-1){const nb=(s.k==='q'?27:s.k==='act'?22:18);const nx=steps[i+1];const nt=(nx.k==='q'?27:nx.k==='act'?22:18);
+     S('path',{d:'M'+sx+','+(cy+nb)+' V'+(cy+rh-nt-2),class:'edge','marker-end':'url(#lm'+host.id+')'},svg);
+     if(s.c)T(svg,sx+8,cy+nb+(rh-nb-nt)/2+4,s.c,'lxl','start');}
+ });
+}
+ladder(document.getElementById('lad-auth'),[
+ {k:'start',t:'request reaches FastAPI'},
+ {k:'q',t:'aws.event has\nclaims.sub?',x:{l:'yes',t:'user id = sub\n(gateway already verified it)',tone:'ok'},c:'no'},
+ {k:'q',t:'came through\nAPI Gateway?',x:{l:'yes',t:'401 · no authenticated user',tone:'err'},c:'no (uvicorn)'},
+ {k:'q',t:'STAGE ≠ prod and\nX-Local-User-Id set?',x:{l:'yes',t:'user id = header value\n(local development only)',tone:'info'},c:'no'},
+ {k:'end',t:'401',tone:'err'}
+],{w:520,sx:120,bx:280,dw:200});
+ladder(document.getElementById('lad-bucket'),[
+ {k:'start',t:'period length in days'},
+ {k:'q',t:'≤ 62 days?',x:{l:'yes',t:'bucket by day\n“Today”, “This month”',tone:'ok'},c:'no'},
+ {k:'q',t:'≤ 400 days?',x:{l:'yes',t:'bucket by week\nquarters, “This year”',tone:'ok'},c:'no'},
+ {k:'end',t:'bucket by month · “All time”'}
+],{w:520,sx:120,bx:280,dw:200});
+ladder(document.getElementById('lad-wa'),[
+ {k:'start',t:'Twilio POSTs the message'},
+ {k:'q',t:'TWILIO_AUTH_TOKEN\nset?',x:{l:'no',t:'503 · integration not configured',tone:'err'},c:'yes'},
+ {k:'q',t:'X-Twilio-Signature\nvalid?',x:{l:'no',t:'403 · invalid signature',tone:'err'},c:'yes'},
+ {k:'q',t:'body is\n“LINK <code>”?',x:{l:'yes',t:'code found and unexpired? → write WHATSAPP#phone/LINK\nand USER#sub/WHATSAPP_LINK, delete code, reply “✅ linked”.\nOtherwise reply “code isn’t valid or has expired”.',tone:'info'},c:'no'},
+ {k:'q',t:'phone linked?\n(WHATSAPP#phone)',x:{l:'no',t:'reply: open the app → Link WhatsApp,\nthen text “LINK <code>”',tone:'info'},c:'yes'},
+ {k:'q',t:'amount found\nin the text?',x:{l:'no',t:'reply: “Try something like ‘150 groceries’”',tone:'info'},c:'yes'},
+ {k:'act',t:'category from keywords\nput EXPENSE#uuid'},
+ {k:'end',t:'reply “Logged ₹150 · auto rickshaw”'}
+],{w:860,bx:330,dw:240,rh:80});
+
+/* ───────── §9 API table ───────── */
+const API=[
+ ['Health','GET','/health','→ {"status":"ok"}','',1],
+ ['Expenses','GET','/expenses','→ Expense[]','All of the caller’s expenses; paginates DynamoDB internally'],
+ ['Expenses','POST','/expenses','ExpenseCreate → Expense (201)','Server assigns id, createdAt, updatedAt; any sent id is ignored'],
+ ['Expenses','PUT','/expenses/{id}','ExpenseUpdate → Expense','Partial: omitted fields untouched, null clears a field'],
+ ['Expenses','DELETE','/expenses/{id}','→ 204','404 if it isn’t the caller’s'],
+ ['Settings','GET','/settings','→ Settings','Defaults INR, DD/MM/YYYY, system, en-IN if never saved'],
+ ['Settings','PUT','/settings','Settings → Settings','Upsert'],
+ ['Budgets','GET','/budgets','→ Budget[]','One per category'],
+ ['Budgets','PUT','/budgets/{category}','Budget → Budget','Upsert keyed by category'],
+ ['Budgets','DELETE','/budgets/{category}','→ 204',''],
+ ['Savings','GET','/savings/entries','→ SavingsEntry[]',''],
+ ['Savings','POST','/savings/entries','SavingsEntryCreate → SavingsEntry',''],
+ ['Savings','PUT','/savings/entries/{id}','SavingsEntryUpdate → SavingsEntry',''],
+ ['Savings','DELETE','/savings/entries/{id}','→ 204',''],
+ ['Savings','GET','/savings/goals','→ SavingsGoal[]',''],
+ ['Savings','POST','/savings/goals','SavingsGoalCreate → SavingsGoal',''],
+ ['Savings','PUT','/savings/goals/{id}','SavingsGoalUpdate → SavingsGoal',''],
+ ['Savings','DELETE','/savings/goals/{id}','→ 204',''],
+ ['Receipts','POST','/receipts/upload-url','{contentType} → {uploadUrl, key}','jpeg, png, webp, heic; URL valid 300 s; PUT with the same Content-Type'],
+ ['Receipts','GET','/receipts/view-url?key=…','→ {viewUrl}','403 unless the key is under the caller’s prefix; 300 s'],
+ ['Receipts','DELETE','/receipts/{key}','→ 204','Same ownership check'],
+ ['WhatsApp','POST','/whatsapp/link-code','→ {code, expiresInSeconds, sandboxNumber}','6-character code, valid 15 min'],
+ ['WhatsApp','GET','/whatsapp/status','→ {linked, phoneNumber?}',''],
+ ['WhatsApp','DELETE','/whatsapp/link','→ 204','Unlinks both directions'],
+ ['WhatsApp','POST','/whatsapp/webhook','Twilio form → TwiML XML','403 without a valid signature; 503 if the token isn’t configured',1]
+];
+(function(){
+ const tb=document.querySelector('#api-tbl tbody'),q=document.getElementById('api-q'),cnt=document.getElementById('api-n');
+ function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+ function draw(){const v=(q.value||'').trim().toLowerCase();let html='',last='',shown=0;
+   API.forEach(function(r){if(v&&r.join(' ').toLowerCase().indexOf(v)<0)return;shown++;
+     if(r[0]!==last){html+='<tr class="grp"><td colspan="4">'+esc(r[0])+'</td></tr>';last=r[0];}
+     html+='<tr><td><span class="m m-'+r[1]+'">'+r[1]+'</span></td><td class="mono">'+esc(r[2])+(r[5]?'<span class="open">public</span>':'')+'</td><td class="mono">'+esc(r[3])+'</td><td>'+esc(r[4])+'</td></tr>';});
+   tb.innerHTML=html||'<tr><td colspan="4" class="muted">No endpoint matches “'+esc(v)+'”.</td></tr>';cnt.textContent=shown+' of '+API.length+' endpoints';}
+ q.addEventListener('input',draw);draw();
+})();
+
+/* ───────── §15 Troubleshooting ───────── */
+const TS=[
+ ['Every API call returns 401','No token, an expired one, or a token from a different pool or client. Sign out and back in, and check that amplify.ts matches the deployed UserPoolId and UserPoolClientId.'],
+ ['Browser console shows CORS errors','The page’s origin is missing from the HTTP API CORS list (and the FastAPI and bucket lists). Add it in all the places listed in §11.'],
+ ['Google or Facebook redirect lands on a blank page locally','The dev server is serving under /ExpenseTrack-Pro/. Use npm run dev:aws, which serves at the root path.'],
+ ['Cognito redirect_mismatch','The exact URL, including scheme, port and trailing slash, isn’t in the app client’s callback list.'],
+ ['Facebook: “Invalid Scopes: email”','Add the email permission to the Facebook Login use case in the Meta developer console.'],
+ ['Auth deploy: “not a valid value for apiVersion”','Cognito only accepts Graph API versions on its own allowlist. v17.0 works; v23.0 and v25.0 were rejected.'],
+ ['Deploy fails resolving {{resolve:secretsmanager:…}}','The secret doesn’t exist in this account or Region. Create it (§11) and deploy again.'],
+ ['cdk synth: “Cannot find asset … frontend/dist-aws”','Build the frontend first with npm run build:aws.'],
+ ['Sign-up code emails stop arriving','Cognito’s default sender is capped at 50 emails a day. Wait, or configure SES.'],
+ ['WhatsApp replies stop, webhook returns 403','The Twilio Auth Token in Secrets Manager is wrong or a placeholder, or Twilio’s webhook URL differs from <ApiUrl>/whatsapp/webhook exactly.'],
+ ['WhatsApp webhook returns 503','TWILIO_AUTH_TOKEN isn’t set on the Lambda. Create the secret and redeploy the Api stack.'],
+ ['Sudden AccessDenied on things that worked','Check the AWS project’s spend limit in AWS Settings → Billing.'],
+ ['Lambda fails with a form parsing assertion','python-multipart is missing from api/requirements.txt.'],
+ ['PDF snapshot shows different fonts or wrapping','The fonts couldn’t be fetched from Google Fonts for embedding. The export still works with fallback fonts.']
+];
+(function(){
+ const list=document.getElementById('ts-list'),q=document.getElementById('ts-q'),cnt=document.getElementById('ts-n');
+ TS.forEach(function(t){const d=document.createElement('details');const s=document.createElement('summary');s.textContent=t[0];const p=document.createElement('p');p.textContent=t[1];d.append(s,p);d.dataset.k=(t[0]+' '+t[1]).toLowerCase();list.appendChild(d);});
+ function f(){const v=q.value.trim().toLowerCase();let n=0;[].forEach.call(list.children,function(d){const hit=!v||d.dataset.k.indexOf(v)>=0;d.hidden=!hit;if(hit)n++;if(v&&hit)d.open=true;});cnt.textContent=n+' of '+TS.length;}
+ q.addEventListener('input',f);f();
+})();
+
+/* ───────── Local dev mode tabs ───────── */
+(function(){
+ const tabs=document.querySelectorAll('#mode-tabs .tab');
+ tabs.forEach(function(b){b.addEventListener('click',function(){tabs.forEach(function(x){x.setAttribute('aria-selected',x===b?'true':'false');});
+   document.querySelectorAll('.mode[data-panel]').forEach(function(p){p.hidden=p.dataset.panel!==b.dataset.mode;});});});
+})();
+
+/* ───────── Copy buttons ───────── */
+document.querySelectorAll('.code .copy').forEach(function(b){b.addEventListener('click',function(){
+ const pre=b.parentElement.querySelector('pre');const text=pre.innerText;
+ function done(msg){b.textContent=msg;setTimeout(function(){b.textContent='Copy';},1600);}
+ function fallback(){const r=document.createRange();r.selectNodeContents(pre);const s=window.getSelection();s.removeAllRanges();s.addRange(r);done('Selected');}
+ try{navigator.clipboard.writeText(text).then(function(){done('Copied');},fallback);}catch(e){fallback();}
+});});
+
+/* ───────── Scrollspy ───────── */
+(function(){
+ const links=[].slice.call(document.querySelectorAll('#toc a'));const map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+ const io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(a){a.classList.remove('on');});const a=map[e.target.id];if(a){a.classList.add('on');const nav=a.parentElement;if(nav.scrollWidth>nav.clientWidth){nav.scrollTo({left:a.offsetLeft-nav.clientWidth/2+a.offsetWidth/2,behavior:'smooth'});}}}});},{rootMargin:'-20% 0px -70% 0px'});
+ document.querySelectorAll('main .sec').forEach(function(s){io.observe(s);});
+ links[0].classList.add('on');
+})();
+})();
+</script>
+
+</body></html>
