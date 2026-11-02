@@ -154,3 +154,28 @@ class Budget(BaseModel):
 # routers/whatsapp.py itself, next to the routes that use them - same
 # convention as receipts.py's UploadUrlRequest/Response, since nothing else
 # needs to import them.
+
+
+# ---- Custom categories ------------------------------------------------
+# Built-in categories and groups live in the frontend (utils/constants.ts).
+# These are the ones a user adds on top: extra sub-categories (under a
+# built-in or custom group) and whole new parent groups. Ids are generated
+# by the client ("cg_…" for groups, "custom_…" for categories) so an expense
+# can reference a custom category before the next full reload.
+
+class CustomCategoryGroup(BaseModel):
+    id: str
+    name: str
+    color: str = "#8C9A8C"
+    icon: str = "🏷️"
+
+
+class CustomCategory(BaseModel):
+    id: str
+    label: str
+    groupId: str
+
+
+class CustomCategories(BaseModel):
+    groups: List[CustomCategoryGroup] = []
+    categories: List[CustomCategory] = []

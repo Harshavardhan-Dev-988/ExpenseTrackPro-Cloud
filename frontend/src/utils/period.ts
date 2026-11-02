@@ -3,6 +3,7 @@
  * always agree on what "this month" covers, what it's compared against,
  * and how a budget limit applies to it.
  */
+import { categoriesForBudgetKey } from './categoryRegistry';
 import {
   addDays,
   differenceInCalendarDays,
@@ -21,7 +22,7 @@ import {
   subMonths,
   subYears,
 } from 'date-fns';
-import type { CategoryBudget, CategoryType, Expense } from '../types';
+import type { CategoryBudget, Expense } from '../types';
 
 export type RangeType = 'all' | 'today' | 'month' | 'year' | 'custom';
 
@@ -185,7 +186,8 @@ export type BudgetState = 'ok' | 'warning' | 'exceeded';
 
 export interface BudgetStatus {
   budget: CategoryBudget;
-  category: CategoryType;
+  /** The budget's key: a category id, or "group:<id>" for a whole group. */
+  category: CategoryBudget['category'];
   spent: number;
   /** The budget's limit scaled to the period being looked at. */
   limit: number;
@@ -218,7 +220,7 @@ export function computeBudgetStatus(budgets: CategoryBudget[], expensesInWindow:
       const type = budget.budgetType || 'monthly';
       const base = type === 'yearly' ? (budget.yearlyLimit || 0) / 12 : budget.monthlyLimit || 0;
       const limit = base * months;
-      const spent = spentBy.get(budget.category) || 0;
+      const spent = categoriesForBudgetKey(budget.category).reduce((sum, c) => sum + (spentBy.get(c) || 0), 0);
       const pct = limit > 0 ? (spent / limit) * 100 : 0;
       const state: BudgetState = pct >= 100 ? 'exceeded' : pct >= (budget.alertThreshold || 80) ? 'warning' : 'ok';
       return { budget, category: budget.category, spent, limit, pct, state };

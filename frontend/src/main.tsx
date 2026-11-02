@@ -7,6 +7,7 @@ import AuthGate from './components/auth/AuthGate'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { ToastProvider } from './components/ui/Toast'
 import { ConfirmProvider } from './components/ui/ConfirmDialog'
+import CategoriesProvider from './components/categories/CategoriesProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')!).render(
       <ToastProvider>
         <ConfirmProvider>
           <AuthGate>
-            <App />
+            <CategoriesProvider>
+              <App />
+            </CategoriesProvider>
           </AuthGate>
         </ConfirmProvider>
       </ToastProvider>

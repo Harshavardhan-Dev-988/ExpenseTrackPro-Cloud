@@ -11,7 +11,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import budgets, expenses, health, receipts, savings, settings, whatsapp
+from routers import budgets, categories, expenses, health, receipts, savings, settings, whatsapp
 
 
 def _allowed_origins() -> list[str]:
@@ -46,5 +46,6 @@ app.include_router(expenses.router)
 app.include_router(settings.router)
 app.include_router(savings.router)
 app.include_router(budgets.router)
+app.include_router(categories.router)
 app.include_router(receipts.router)
 app.include_router(whatsapp.router)

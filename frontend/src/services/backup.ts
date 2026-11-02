@@ -1,5 +1,5 @@
 import { cloudApi as db } from './cloudApi';
-import type { Expense, CategoryBudget, Settings, CategoryType } from '../types';
+import type { Expense, CategoryBudget, Settings, CategoryType, CustomCategoryData } from '../types';
 import { CATEGORY_LABELS } from '../utils/constants';
 
 export interface BackupData {
@@ -9,6 +9,8 @@ export interface BackupData {
     expenses: Expense[];
     budgets: CategoryBudget[];
     settings: Settings | null;
+    /** The user's own groups and categories (added in backup format 1.1). */
+    customCategories?: CustomCategoryData;
   };
   metadata: {
     expenseCount: number;
@@ -28,7 +30,8 @@ export async function exportBackup(): Promise<BackupData> {
     // Fetch all data from database
     const expenses = await db.getAllExpenses();
     const budgets = await db.getAllBudgets();
-    const settings = await db.getSettings();
+    const settings = (await db.getSettings()) ?? null;
+    const customCategories = await db.getCustomCategories().catch(() => ({ groups: [], categories: [] }));
 
     // Calculate metadata
     const dates = expenses.map(e => new Date(e.date).getTime()).filter(d => !isNaN(d));
@@ -36,12 +39,13 @@ export async function exportBackup(): Promise<BackupData> {
     const latest = dates.length > 0 ? new Date(Math.max(...dates)).toISOString() : null;
 
     const backup: BackupData = {
-      version: '1.0',
+      version: '1.1',
       exportDate: new Date().toISOString(),
       data: {
         expenses,
         budgets,
         settings,
+        customCategories,
       },
       metadata: {
         expenseCount: expenses.length,
@@ -116,7 +120,7 @@ export function validateBackup(data: any): { valid: boolean; error?: string } {
  * @param backup Validated backup data
  * @param mode 'merge' to keep existing data, 'replace' to clear and import
  */
-export type ImportPhase = 'clearing' | 'expenses' | 'budgets' | 'settings';
+export type ImportPhase = 'clearing' | 'categories' | 'expenses' | 'budgets' | 'settings';
 export type ImportProgress = (phase: ImportPhase, done: number, total: number) => void;
 
 export async function importBackup(
@@ -130,6 +134,23 @@ export async function importBackup(
       onProgress?.('clearing', 0, 0);
       await db.clearAllExpenses((done, total) => onProgress?.('clearing', done, total));
       await db.clearAllBudgets();
+    }
+
+    // Custom groups/categories first, so restored expenses that use them
+    // have names straight away. Upserts: an existing one is just renamed.
+    const custom = backup.data.customCategories;
+    if (custom && (custom.groups?.length || custom.categories?.length)) {
+      const items = (custom.groups?.length ?? 0) + (custom.categories?.length ?? 0);
+      let done = 0;
+      onProgress?.('categories', 0, items);
+      for (const g of custom.groups ?? []) {
+        await db.saveCustomGroup(g);
+        onProgress?.('categories', ++done, items);
+      }
+      for (const c of custom.categories ?? []) {
+        await db.saveCustomCategory(c);
+        onProgress?.('categories', ++done, items);
+      }
     }
 
     // Create reverse mapping for category labels to keys (for legacy backups)

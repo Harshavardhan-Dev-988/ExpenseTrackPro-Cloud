@@ -1,6 +1,7 @@
 import type { Expense, CategoryType, CategoryStats } from '../types';
 import { format, parse, isValid } from 'date-fns';
-import { CATEGORY_GROUPS, CATEGORY_LABELS, CATEGORY_GROUP_PALETTE } from './constants';
+import { CATEGORY_GROUPS } from './constants';
+import { categoryLabel, groupColor } from './categoryRegistry';
 
 /** Which of the CATEGORY_GROUPS a category belongs to — used to give
  * every category a consistent icon and group color across the redesigned UI. */
@@ -11,6 +12,8 @@ export const getCategoryIcon = (category: CategoryType): string =>
   getCategoryGroup(category)?.icon || '💰';
 
 export interface CategoryGroupBreakdown {
+  /** Group id ("groceries", "cg_…"), or "__unassigned" for categories in no group. */
+  id: string;
   name: string;
   icon: string;
   value: number;
@@ -29,36 +32,43 @@ export interface CategoryGroupBreakdown {
  * numbers whichever view you're looking at it from.
  */
 export function getCategoryGroupBreakdown(categoryStats: CategoryStats[]): CategoryGroupBreakdown[] {
-  return CATEGORY_GROUPS.map((group, i) => {
-    const groupTotal = categoryStats
-      .filter((stat) => group.categories.includes(stat.category))
-      .reduce((sum, stat) => sum + stat.total, 0);
+  const toSub = (stat: CategoryStats) => ({
+    category: stat.category,
+    label: categoryLabel(stat.category),
+    total: stat.total,
+    count: stat.count,
+  });
 
-    const groupCount = categoryStats
-      .filter((stat) => group.categories.includes(stat.category))
-      .reduce((sum, stat) => sum + stat.count, 0);
-
-    const subcategories = categoryStats
-      .filter((stat) => group.categories.includes(stat.category) && stat.total > 0)
-      .map((stat) => ({
-        category: stat.category,
-        label: CATEGORY_LABELS[stat.category] || stat.category,
-        total: stat.total,
-        count: stat.count,
-      }))
-      .sort((a, b) => b.total - a.total);
-
+  const groups: CategoryGroupBreakdown[] = CATEGORY_GROUPS.map((group) => {
+    const stats = categoryStats.filter((stat) => (group.categories as string[]).includes(stat.category));
     return {
+      id: group.id,
       name: group.name,
       icon: group.icon,
-      value: groupTotal,
-      count: groupCount,
-      color: CATEGORY_GROUP_PALETTE[i % CATEGORY_GROUP_PALETTE.length],
-      subcategories,
+      value: stats.reduce((sum, stat) => sum + stat.total, 0),
+      count: stats.reduce((sum, stat) => sum + stat.count, 0),
+      color: groupColor(group),
+      subcategories: stats.filter((stat) => stat.total > 0).map(toSub).sort((a, b) => b.total - a.total),
     };
-  })
-    .filter((group) => group.value > 0)
-    .sort((a, b) => b.value - a.value);
+  });
+
+  // Spend on a category that's in no group (e.g. a custom category whose
+  // definition couldn't be loaded) still has to add up to the period total.
+  const grouped = new Set(CATEGORY_GROUPS.flatMap((g) => g.categories as string[]));
+  const loose = categoryStats.filter((stat) => !grouped.has(stat.category) && stat.total > 0);
+  if (loose.length) {
+    groups.push({
+      id: '__unassigned',
+      name: 'Unassigned',
+      icon: '❔',
+      value: loose.reduce((sum, stat) => sum + stat.total, 0),
+      count: loose.reduce((sum, stat) => sum + stat.count, 0),
+      color: '#8C9A8C',
+      subcategories: loose.map(toSub).sort((a, b) => b.total - a.total),
+    });
+  }
+
+  return groups.filter((group) => group.value > 0).sort((a, b) => b.value - a.value);
 }
 
 export const generateId = (): string => {

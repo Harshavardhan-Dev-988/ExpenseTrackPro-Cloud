@@ -17,7 +17,16 @@
  * or wipe doesn't fire hundreds of requests at once.
  */
 import { fetchAuthSession } from 'aws-amplify/auth';
-import type { CategoryBudget, Expense, SavingsEntry, SavingsGoal, Settings } from '../types';
+import type {
+  CategoryBudget,
+  CustomCategory,
+  CustomCategoryGroup,
+  CustomCategoryData,
+  Expense,
+  SavingsEntry,
+  SavingsGoal,
+  Settings,
+} from '../types';
 
 export interface WhatsAppLinkCode {
   code: string;
@@ -191,6 +200,35 @@ class CloudApiService {
   async clearAllBudgets(): Promise<void> {
     const existing = await this.getAllBudgets();
     await mapWithConcurrency(existing, 5, (budget) => this.deleteBudget(budget.category));
+  }
+
+  // ===== CUSTOM CATEGORIES =====
+
+  async getCustomCategories(): Promise<CustomCategoryData> {
+    const data = await request<Partial<CustomCategoryData>>('/categories');
+    return { groups: data.groups ?? [], categories: data.categories ?? [] };
+  }
+
+  async saveCustomGroup(group: CustomCategoryGroup): Promise<void> {
+    await request(`/categories/groups/${encodeURIComponent(group.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(group),
+    });
+  }
+
+  async deleteCustomGroup(id: string): Promise<void> {
+    await request(`/categories/groups/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async saveCustomCategory(category: CustomCategory): Promise<void> {
+    await request(`/categories/items/${encodeURIComponent(category.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(category),
+    });
+  }
+
+  async deleteCustomCategory(id: string): Promise<void> {
+    await request(`/categories/items/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // ===== SETTINGS OPERATIONS =====

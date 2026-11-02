@@ -123,14 +123,39 @@ export interface Expense {
 
 // Category grouping for UI organization
 export interface CategoryGroup {
+  /** Stable id: a slug of the name for built-in groups, "cg_…" for custom ones. */
+  id: string;
   name: string;
   icon: string;
   categories: CategoryType[];
   color: string;
+  /** True for groups the user created. */
+  custom?: boolean;
+}
+
+/** A parent group the user created (stored via /categories). */
+export interface CustomCategoryGroup {
+  id: string;        // "cg_…"
+  name: string;
+  color: string;
+  icon: string;
+}
+
+/** A sub-category the user created, under a built-in or custom group. */
+export interface CustomCategory {
+  id: string;        // "custom_…" — what expenses store in `category`
+  label: string;
+  groupId: string;
+}
+
+export interface CustomCategoryData {
+  groups: CustomCategoryGroup[];
+  categories: CustomCategory[];
 }
 
 export interface CategoryBudget {
-  category: CategoryType;
+  /** A category id, or "group:<groupId>" for a budget on a whole parent group. */
+  category: CategoryType | `group:${string}`;
   monthlyLimit?: number;         // Optional: for monthly budgets
   yearlyLimit?: number;          // Optional: for yearly budgets
   budgetType: 'monthly' | 'yearly';

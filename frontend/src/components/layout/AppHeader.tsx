@@ -16,6 +16,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ExportFormat } from '../../hooks/useExportActions';
 import { NAV_ITEMS, type View } from './nav';
+import AccountMenu, { type AccountStats } from './AccountMenu';
+import type { UserProfile } from '../../hooks/useUserProfile';
 
 
 interface AppHeaderProps {
@@ -31,6 +33,10 @@ interface AppHeaderProps {
   isDarkMode: boolean;
   onToggleTheme: () => void;
   onSignOut: () => void;
+  onManageCategories: () => void;
+  profile: UserProfile | null;
+  accountStats: AccountStats;
+  currency: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +66,7 @@ const ICONS = {
   sun: icon('M12 3v1.5m0 15V21m9-9h-1.5m-15 0H3m15.36-6.36l-1.06 1.06M6.7 17.3l-1.06 1.06m12.72 0l-1.06-1.06M6.7 6.7L5.64 5.64M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z'),
   signout: icon('M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1'),
   chevron: icon('M19 9l-7 7-7-7'),
+  tag: icon(['M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z']),
   dashboard: icon('M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zm10-3a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z'),
   expenses: icon('M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6-4h6'),
   budgets: icon(['M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z', 'M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z']),
@@ -78,7 +85,8 @@ const VIEW_ICONS: Record<View, ReactNode> = {
 // ---------------------------------------------------------------------------
 // Shared menu content (used by both the desktop dropdown and mobile drawer)
 // ---------------------------------------------------------------------------
-interface MenuContentProps extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense'> {
+interface MenuContentProps
+  extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense' | 'profile' | 'accountStats' | 'currency'> {
   close: () => void;
 }
 
@@ -138,6 +146,7 @@ function MenuContent({
   isDarkMode,
   onToggleTheme,
   onSignOut,
+  onManageCategories,
 }: MenuContentProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const run = (fn: () => void) => () => {
@@ -150,6 +159,9 @@ function MenuContent({
       <MenuSectionLabel>Your data</MenuSectionLabel>
       <MenuItem iconNode={ICONS.import} hint="CSV, Excel or JSON file" onSelect={run(onImport)}>
         Import expenses
+      </MenuItem>
+      <MenuItem iconNode={ICONS.tag} hint="Add your own groups and categories" onSelect={run(onManageCategories)}>
+        Categories
       </MenuItem>
       <MenuItem iconNode={ICONS.backup} hint="Download or restore everything" onSelect={run(onBackup)}>
         Backup &amp; restore
@@ -368,6 +380,15 @@ export default function AppHeader(props: AppHeaderProps) {
                 )}
               </AnimatePresence>
             </div>
+
+            <AccountMenu
+              profile={props.profile}
+              stats={props.accountStats}
+              currency={props.currency}
+              onManageCategories={props.onManageCategories}
+              onWhatsApp={props.onWhatsApp}
+              onSignOut={props.onSignOut}
+            />
           </div>
         </div>
 

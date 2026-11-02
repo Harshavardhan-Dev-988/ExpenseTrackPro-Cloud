@@ -316,11 +316,17 @@ Base URL: the stack's `ApiUrl`. All bodies are JSON with camelCase fields. All r
 | `PUT /settings` | `Settings` → `Settings` | Upsert |
 | **Budgets** (one per category) | | |
 | `GET /budgets` | → `Budget[]` | |
-| `PUT /budgets/{category}` | `Budget` → `Budget` | Upsert keyed by category |
+| `PUT /budgets/{category}` | `Budget` → `Budget` | Upsert keyed by category, or `group:<groupId>` for a budget on a whole parent group |
 | `DELETE /budgets/{category}` | → 204 | |
 | **Savings** | | |
 | `GET/POST /savings/entries`, `PUT/DELETE /savings/entries/{id}` | `SavingsEntryCreate`/`Update` → `SavingsEntry` | |
 | `GET/POST /savings/goals`, `PUT/DELETE /savings/goals/{id}` | `SavingsGoalCreate`/`Update` → `SavingsGoal` | |
+| **Custom categories** | | |
+| `GET /categories` | → `{groups, categories}` | The user's own groups and sub-categories (built-ins live in the frontend) |
+| `PUT /categories/groups/{id}` | `CustomCategoryGroup` → same | Upsert; ids start `cg_` |
+| `DELETE /categories/groups/{id}` | → 204 | 409 while any custom category still points at it |
+| `PUT /categories/items/{id}` | `CustomCategory` → same | Upsert (create, rename, move group); ids start `custom_` |
+| `DELETE /categories/items/{id}` | → 204 | The app moves the category's expenses elsewhere first |
 | **Receipts** | | |
 | `POST /receipts/upload-url` | `{contentType}` → `{uploadUrl, key}` | `image/jpeg`, `image/png`, `image/webp`, `image/heic` only; URL valid 300 s; browser then `PUT`s the file with the same `Content-Type` |
 | `GET /receipts/view-url?key=…` | → `{viewUrl}` | 403 unless the key is under the caller's own prefix; URL valid 300 s |
@@ -365,7 +371,9 @@ On-demand billing, no secondary indexes. Every access is a `GetItem` on a full k
 |---|---|---|---|
 | Expense | `USER#<sub>` | `EXPENSE#<uuid>` | `id, date, amount, category, description, paymentMethod?, tags?, receiptUrl?, createdAt, updatedAt` |
 | Settings | `USER#<sub>` | `SETTINGS` | `currency, dateFormat, theme, locale` |
-| Budget | `USER#<sub>` | `BUDGET#<category>` | `category, monthlyLimit?, yearlyLimit?, budgetType, alertThreshold, isActive` |
+| Custom group | `USER#<sub>` | `CATGROUP#<cg_…>` | `id, name, color, icon` |
+| Custom category | `USER#<sub>` | `CATEGORY#<custom_…>` | `id, label, groupId` (a built-in group id or a `cg_…` id) |
+| Budget | `USER#<sub>` | `BUDGET#<category>` or `BUDGET#group:<groupId>` | `category, monthlyLimit?, yearlyLimit?, budgetType, alertThreshold, isActive` |
 | Savings entry | `USER#<sub>` | `SAVINGS_ENTRY#<uuid>` | `id, date, amount, category, description, account?, interestRate?, maturityDate?, isRecurring?, tags?, createdAt, updatedAt` |
 | Savings goal | `USER#<sub>` | `SAVINGS_GOAL#<uuid>` | `id, name, targetAmount, currentAmount, deadline?, category, priority, isActive, createdAt` |
 | WhatsApp link (user → phone) | `USER#<sub>` | `WHATSAPP_LINK` | `phoneNumber` |
@@ -485,7 +493,9 @@ Shared by the dashboard and the PDF report so they always agree:
 
 ### Categories
 
-`types/index.ts` defines 81 `CategoryType` values in 13 groups (`utils/constants.ts` → `CATEGORY_GROUPS`, `CATEGORY_LABELS`, `CATEGORY_GROUP_PALETTE`), tailored to Indian households (UPI, Blinkit/Zepto/Zomato, maid/cook/driver, festivals, school fees, agriculture). `agri_seeds_fertilizers` is a legacy combined category kept only so old data still imports.
+Users can add their own sub-categories (under any group) and whole new groups from **☰ → Categories**, or straight from the category picker in the expense form. `CategoriesProvider` loads them once after sign-in and `utils/categoryRegistry.ts` merges them into `CATEGORY_GROUPS` / `CATEGORY_LABELS`, so every picker, chart, export and filter sees them. Backups (format 1.1) include them.
+
+`types/index.ts` defines 81 built-in `CategoryType` values in 13 groups (`utils/constants.ts` → `CATEGORY_GROUPS`, `CATEGORY_LABELS`, `CATEGORY_GROUP_PALETTE`), tailored to Indian households (UPI, Blinkit/Zepto/Zomato, maid/cook/driver, festivals, school fees, agriculture). `agri_seeds_fertilizers` is a legacy combined category kept only so old data still imports.
 
 ---
 

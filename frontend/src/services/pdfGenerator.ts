@@ -11,6 +11,7 @@
  * jsPDF's built-in fonts only cover Latin-1, so the rupee sign is written
  * as "Rs" and any other characters outside that range are replaced.
  */
+import { budgetLabel } from '../utils/categoryRegistry';
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { CategoryBudget, CategoryStats, CategoryType, Expense } from '../types';
@@ -555,7 +556,7 @@ export function generateExpenseReport({ allExpenses, budgets, period, currency, 
           },
         ],
         statuses.map((s) => [
-          CATEGORY_LABELS[s.category] || s.category,
+          budgetLabel(s.category),
           money(s.limit, { decimals: 0 }),
           money(s.spent, { decimals: 0 }),
           `${s.pct.toFixed(0)}%`,

@@ -4,6 +4,8 @@ import type { CategoryType, PaymentMethod, Expense } from '../../types';
 import { CATEGORY_GROUPS, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
 import cloudApi from '../../services/cloudApi';
 import Spinner from '../ui/Spinner';
+import { useCategories } from '../categories/categoriesContext';
+import { newCustomCategoryId } from '../../utils/categoryRegistry';
 
 // Kept in sync by hand with backend/api/routers/receipts.py's
 // ALLOWED_CONTENT_TYPES - the backend is the real gate (it rejects anything
@@ -55,6 +57,12 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
   const [tags, setTags] = useState('');
   const [showTags, setShowTags] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatGroup, setNewCatGroup] = useState('');
+  const [newCatBusy, setNewCatBusy] = useState(false);
+  const [newCatError, setNewCatError] = useState('');
+  const { saveCategory } = useCategories();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -129,7 +137,47 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
   };
 
   const paymentMethods: PaymentMethod[] = ['cash', 'card', 'upi', 'netbanking', 'cheque', 'other'];
+
+  // Picker search: match on category or group name.
+  const q = pickerQuery.trim().toLowerCase();
+  const pickerGroups = CATEGORY_GROUPS.map((g) => ({
+    ...g,
+    categories: !q || g.name.toLowerCase().includes(q)
+      ? g.categories
+      : g.categories.filter((c) => (CATEGORY_LABELS[c] || c).toLowerCase().includes(q)),
+  })).filter((g) => g.categories.length > 0 || (!q && g.custom));
+
+  const createCategory = async () => {
+    const label = newCatName.trim();
+    const groupId = newCatGroup || selectedGroupForNew();
+    if (!label) {
+      setNewCatError('Give the category a name');
+      return;
+    }
+    const clash = Object.values(CATEGORY_LABELS).some((l) => l.toLowerCase() === label.toLowerCase());
+    if (clash) {
+      setNewCatError('A category with that name already exists');
+      return;
+    }
+    setNewCatBusy(true);
+    setNewCatError('');
+    try {
+      const id = newCustomCategoryId(label);
+      await saveCategory({ id, label, groupId });
+      setCategory(id as CategoryType);
+      setNewCatName('');
+      setPickerQuery('');
+      setPickerOpen(false);
+    } catch {
+      setNewCatError("Couldn't save the category. Try again.");
+    } finally {
+      setNewCatBusy(false);
+    }
+  };
   const selectedGroup = CATEGORY_GROUPS.find((g) => g.categories.includes(category));
+  function selectedGroupForNew() {
+    return selectedGroup?.id ?? CATEGORY_GROUPS[0].id;
+  }
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -319,32 +367,92 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
                   transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="border border-line rounded-lg p-3 max-h-56 overflow-y-auto flex flex-col gap-3">
-                    {CATEGORY_GROUPS.map((group) => (
-                      <div key={group.name}>
-                        <p className="text-[10px] uppercase tracking-wide text-slate font-mono mb-1.5 flex items-center gap-1.5">
-                          <span aria-hidden="true">{group.icon}</span>
-                          {group.name}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.categories.map((cat) => (
-                            <button
-                              key={cat}
-                              type="button"
-                              onClick={() => {
-                                setCategory(cat);
-                                setPickerOpen(false);
-                              }}
-                              className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                                category === cat ? 'bg-pine text-paper' : 'bg-paper text-ink hover:bg-line/60'
-                              }`}
-                            >
-                              {CATEGORY_LABELS[cat] || cat}
-                            </button>
-                          ))}
+                  <div className="border border-line rounded-lg overflow-hidden">
+                    <div className="p-2 border-b border-line bg-paper/60">
+                      <input
+                        type="search"
+                        value={pickerQuery}
+                        onChange={(e) => setPickerQuery(e.target.value)}
+                        placeholder="Search categories…"
+                        aria-label="Search categories"
+                        className="w-full px-3 py-1.5 rounded-md border border-line bg-surface text-sm text-ink focus:outline-none focus:border-pine"
+                      />
+                    </div>
+                    <div className="p-3 max-h-56 overflow-y-auto flex flex-col gap-3">
+                      {pickerGroups.length === 0 && (
+                        <p className="text-xs text-slate">No category matches “{pickerQuery}”. Add it below.</p>
+                      )}
+                      {pickerGroups.map((group) => (
+                        <div key={group.id}>
+                          <p className="text-[10px] uppercase tracking-wide text-slate font-mono mb-1.5 flex items-center gap-1.5">
+                            <span aria-hidden="true">{group.icon}</span>
+                            {group.name}
+                            {group.custom && <span className="normal-case tracking-normal text-pine">· yours</span>}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {group.categories.length === 0 && <span className="text-xs text-slate">No categories yet</span>}
+                            {group.categories.map((cat) => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => {
+                                  setCategory(cat);
+                                  setPickerOpen(false);
+                                  setPickerQuery('');
+                                }}
+                                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                                  category === cat ? 'bg-pine text-paper' : 'bg-paper text-ink hover:bg-line/60'
+                                } ${cat.startsWith('custom_') && category !== cat ? 'ring-1 ring-inset ring-pine/30' : ''}`}
+                              >
+                                {CATEGORY_LABELS[cat] || cat}
+                              </button>
+                            ))}
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                    {/* Quick-create: a new sub-category without leaving the form */}
+                    <div className="p-2.5 border-t border-line bg-paper/60">
+                      <p className="text-[10px] uppercase tracking-wide text-slate font-mono mb-1.5">New category</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={newCatName}
+                          onChange={(e) => setNewCatName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              createCategory();
+                            }
+                          }}
+                          placeholder={pickerQuery || 'e.g. Kirana store'}
+                          maxLength={40}
+                          aria-label="New category name"
+                          className="flex-1 min-w-0 px-3 py-1.5 rounded-md border border-line bg-surface text-sm text-ink focus:outline-none focus:border-pine"
+                        />
+                        <select
+                          value={newCatGroup || selectedGroupForNew()}
+                          onChange={(e) => setNewCatGroup(e.target.value)}
+                          aria-label="Group for the new category"
+                          className="sm:w-40 px-2 py-1.5 rounded-md border border-line bg-surface text-sm text-ink focus:outline-none focus:border-pine"
+                        >
+                          {CATEGORY_GROUPS.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.icon} {g.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={createCategory}
+                          disabled={newCatBusy}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-pine text-paper text-sm font-semibold hover:bg-pine-strong disabled:opacity-60"
+                        >
+                          {newCatBusy ? <Spinner size="sm" tone="paper" /> : '+'} Add
+                        </button>
                       </div>
-                    ))}
+                      {newCatError && <p className="text-ember text-xs mt-1.5">{newCatError}</p>}
+                    </div>
                   </div>
                 </motion.div>
               )}

@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, memo } from 'react';
-import type { CategoryBudget, Expense } from '../../types';
-import { CATEGORY_LABELS } from '../../utils/constants';
+import type { CategoryBudget, CategoryType, Expense } from '../../types';
+import { budgetLabel, categoriesForBudgetKey } from '../../utils/categoryRegistry';
 import { formatMoney } from '../../utils/helpers';
 
 interface BudgetAlertsProps {
@@ -32,7 +32,7 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
     const allAlerts = budgets
       .filter(budget => budget.isActive)
       .map(budget => {
-        const spent = spending[budget.category] || 0;
+        const spent = categoriesForBudgetKey(budget.category).reduce((sum, c) => sum + (spending[c as CategoryType] || 0), 0);
         // Get the appropriate limit based on budget type (default to monthly for legacy budgets)
         const budgetTypeValue = budget.budgetType || 'monthly';
         const limit = budgetTypeValue === 'monthly' 
@@ -132,7 +132,7 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {budgets.map(budget => (
                       <div key={budget.category} className="text-xs bg-paper rounded-lg p-2 border border-line font-mono">
-                        <div className="font-semibold text-ink">{CATEGORY_LABELS[budget.category] || budget.category}</div>
+                        <div className="font-semibold text-ink">{budgetLabel(budget.category)}</div>
                         <div className="text-slate mt-0.5">₹0 spent · 0% used</div>
                       </div>
                     ))}
@@ -206,7 +206,7 @@ function BudgetAlerts({ budgets, expenses, onManageBudgets, dateRangeType = 'mon
         {alerts.map(({ budget, spent, limit, percentage, status }) => (
           <div key={budget.category} className="card-surface p-3">
             <div className="flex justify-between items-start mb-1.5">
-              <h4 className="text-sm font-medium text-ink">{CATEGORY_LABELS[budget.category] || budget.category || 'Unknown'}</h4>
+              <h4 className="text-sm font-medium text-ink">{budgetLabel(budget.category)}</h4>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium font-mono ${
                 status === 'exceeded' ? 'bg-ember/10 text-ember-strong dark:text-ember' : 'bg-brass/10 text-brass-strong dark:text-brass'
               }`}>

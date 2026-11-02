@@ -15,6 +15,7 @@ import Spinner from '../ui/Spinner';
 
 const PHASE_LABEL: Record<ImportPhase, string> = {
   clearing: 'Clearing current data',
+  categories: 'Restoring your categories',
   expenses: 'Restoring expenses',
   budgets: 'Restoring budgets',
   settings: 'Restoring settings',

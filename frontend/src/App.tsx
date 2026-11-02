@@ -15,17 +15,19 @@ import ExpenseFilters from './components/expenses/ExpenseFilters';
 import CategoryExpensesModal from './components/dashboard/CategoryExpensesModal';
 import BulkUpload from './components/forms/BulkUpload';
 import AnalyticsDashboard from './components/analytics/AnalyticsDashboard';
-import BudgetManager from './components/budgets/BudgetManager';
 import BudgetsView from './components/budgets/BudgetsView';
 import BackupRestore from './components/backup/BackupRestore';
 import WhatsAppLink from './components/whatsapp/WhatsAppLink';
 import PDFReportGenerator from './components/reports/PDFReportGenerator';
 import SavingsTracker from './components/savings/SavingsTracker';
+import CategoryManager from './components/categories/CategoryManager';
+import { useCategories } from './components/categories/categoriesContext';
+import { useUserProfile } from './hooks/useUserProfile';
 import Spinner from './components/ui/Spinner';
 import { useToast, errorMessage } from './components/ui/toastContext';
 import { useConfirm } from './components/ui/confirmContext';
 import { generateId, formatMoney } from './utils/helpers';
-import { cloudApi as db } from './services/cloudApi';
+import { cloudApi as db, mapWithConcurrency } from './services/cloudApi';
 import { CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from './utils/constants';
 import { inPeriod, resolvePeriod, type DashboardRange } from './utils/period';
 import type { Expense, CategoryType, PaymentMethod, CategoryBudget } from './types';
@@ -61,11 +63,13 @@ function App() {
 
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [showBudgetManager, setShowBudgetManager] = useState(false);
   const [showBackupRestore, setShowBackupRestore] = useState(false);
   const [showWhatsAppLink, setShowWhatsAppLink] = useState(false);
   const [showPDFGenerator, setShowPDFGenerator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const profile = useUserProfile();
+  const { data: customCategoryData, reload: reloadCategories } = useCategories();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   // "Where it went" → click a category → this popup with every entry
@@ -153,6 +157,25 @@ function App() {
       {} as Record<CategoryType, number>
     );
   }, [expenses]);
+
+  // Facts for the account panel.
+  const accountStats = useMemo(() => {
+    let first: Date | undefined;
+    const used = new Set<string>();
+    for (const e of expenses) {
+      const d = new Date(e.date);
+      if (!first || d < first) first = d;
+      used.add(e.category);
+    }
+    const thisMonth = Object.values(currentMonthSpending).reduce((a, b) => a + b, 0);
+    return {
+      entries: expenses.length,
+      firstEntry: first,
+      thisMonth,
+      categoriesUsed: used.size,
+      customCategories: customCategoryData.categories.length,
+    };
+  }, [expenses, currentMonthSpending, customCategoryData]);
 
   // Dashboard period → filtered expenses
   const dashboardPeriod = useMemo(() => resolvePeriod(dashboardRange, expenses), [dashboardRange, expenses]);
@@ -303,10 +326,26 @@ function App() {
 
   const handleRestoreComplete = async () => {
     try {
-      await Promise.all([refreshExpenses(), loadBudgets(), refreshSettings()]);
+      await Promise.all([reloadCategories(), refreshExpenses(), loadBudgets(), refreshSettings()]);
     } catch (error) {
       toast.error("Couldn't refresh after the restore", 'Reload the page to see everything.');
       console.error(error);
+    }
+  };
+
+  // Before a custom category is deleted, its expenses (and its budget, if
+  // any) move to the category the user picked.
+  const reassignCategory = async (from: string, to: string, onProgress?: (done: number, total: number) => void) => {
+    const affected = expenses.filter((e) => e.category === from);
+    await mapWithConcurrency(
+      affected,
+      5,
+      (e) => updateExpense({ ...e, category: to as CategoryType, updatedAt: new Date() }),
+      onProgress
+    );
+    if (budgets.some((b) => b.category === from)) {
+      await db.deleteBudget(from).catch(() => undefined);
+      await loadBudgets();
     }
   };
 
@@ -376,6 +415,10 @@ function App() {
         isDarkMode={isDarkMode}
         onToggleTheme={toggleTheme}
         onSignOut={handleSignOut}
+        onManageCategories={() => setShowCategoryManager(true)}
+        profile={profile}
+        accountStats={accountStats}
+        currency={currency}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 lg:py-7">
@@ -468,21 +511,22 @@ function App() {
 
       {showBulkUpload && <BulkUpload onUpload={handleBulkUpload} onCancel={() => setShowBulkUpload(false)} />}
 
-      {showBudgetManager && (
-        <BudgetManager
-          currentSpending={currentMonthSpending}
-          onClose={() => {
-            setShowBudgetManager(false);
-            loadBudgets();
-          }}
-        />
-      )}
-
       {showBackupRestore && (
         <BackupRestore onClose={() => setShowBackupRestore(false)} onRestoreComplete={handleRestoreComplete} />
       )}
 
       {showWhatsAppLink && <WhatsAppLink onClose={() => setShowWhatsAppLink(false)} />}
+
+      <AnimatePresence>
+        {showCategoryManager && (
+          <CategoryManager
+            expenses={expenses}
+            currency={currency}
+            onReassign={reassignCategory}
+            onClose={() => setShowCategoryManager(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {showPDFGenerator && (
         <PDFReportGenerator

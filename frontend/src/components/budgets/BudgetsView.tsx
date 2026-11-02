@@ -1,7 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { CategoryType, CategoryBudget, Expense } from '../../types';
-import { CATEGORY_LABELS } from '../../utils/constants';
+import { CATEGORY_GROUPS, CATEGORY_LABELS } from '../../utils/constants';
 import { formatMoney } from '../../utils/helpers';
+import {
+  budgetLabel,
+  categoriesForBudgetKey,
+  getGroupById,
+  groupBudgetKey,
+  groupColor,
+  groupIdFromBudgetKey,
+  groupOfCategory,
+  isGroupBudgetKey,
+} from '../../utils/categoryRegistry';
 import { cloudApi as db } from '../../services/cloudApi';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import BudgetAlerts from './BudgetAlerts';
@@ -20,7 +30,9 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBudget, setEditingBudget] = useState<CategoryBudget | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType | ''>('');
+  // The budget's key: a category id, or "group:<id>" for a whole parent group.
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [target, setTarget] = useState<'category' | 'group'>('category');
   const [budgetType, setBudgetType] = useState<'monthly' | 'yearly'>('monthly');
   const [budgetLimit, setBudgetLimit] = useState('');
   const [alertThreshold, setAlertThreshold] = useState('80');
@@ -80,7 +92,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
     setSaving(true);
     try {
       const budget: CategoryBudget = {
-        category: selectedCategory as CategoryType,
+        category: selectedCategory as CategoryBudget['category'],
         budgetType,
         ...(budgetType === 'monthly' 
           ? { monthlyLimit: parseFloat(budgetLimit) }
@@ -94,7 +106,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
       await loadBudgets();
       toast.success(
         editingBudget ? 'Budget updated' : 'Budget saved',
-        `${CATEGORY_LABELS[budget.category] || budget.category} · ${formatMoney(
+        `${budgetLabel(budget.category)} · ${formatMoney(
           (budget.budgetType === 'yearly' ? budget.yearlyLimit : budget.monthlyLimit) || 0,
           'INR'
         )} ${budget.budgetType === 'yearly' ? 'a year' : 'a month'}`
@@ -108,8 +120,8 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
     }
   };
 
-  const handleDeleteBudget = async (category: CategoryType) => {
-    const label = CATEGORY_LABELS[category] || category;
+  const handleDeleteBudget = async (category: string) => {
+    const label = budgetLabel(category);
     const deleted = await confirm({
       title: `Delete the ${label} budget?`,
       message: 'Your expenses stay as they are — only the spending limit and its alerts are removed.',
@@ -127,6 +139,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
   const handleEditBudget = (budget: CategoryBudget) => {
     setEditingBudget(budget);
     setSelectedCategory(budget.category);
+    setTarget(isGroupBudgetKey(budget.category) ? 'group' : 'category');
     // Default to 'monthly' if budgetType is undefined (legacy budgets)
     setBudgetType(budget.budgetType || 'monthly');
     const limitValue = budget.budgetType === 'yearly' 
@@ -141,6 +154,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
     setShowAddForm(false);
     setEditingBudget(null);
     setSelectedCategory('');
+    setTarget('category');
     setBudgetType('monthly');
     setBudgetLimit('');
     setAlertThreshold('80');
@@ -168,7 +182,6 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
 
   // Calculate spending for the selected period
   const filteredExpenses = useMemo(() => {
-    const now = new Date();
     if (viewPeriod === 'month') {
       const [year, month] = selectedMonth.split('-').map(Number);
       const start = startOfMonth(new Date(year, month - 1, 1));
@@ -195,10 +208,27 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
     }, {} as Record<CategoryType, number>);
   }, [filteredExpenses]);
 
-  const categories = Object.keys(CATEGORY_LABELS) as CategoryType[];
-  const availableCategories = categories.filter(
-    cat => !budgets.find(b => b.category === cat) || cat === selectedCategory
-  );
+  const spentFor = (key: string) =>
+    categoriesForBudgetKey(key).reduce((sum, c) => sum + (periodSpending[c as CategoryType] || 0), 0);
+  const taken = (key: string) => budgets.some((b) => b.category === key) && key !== editingBudget?.category;
+
+  // Group budgets first (biggest picture), then category budgets in group order.
+  const groupOrder = (key: string) => {
+    if (isGroupBudgetKey(key)) return CATEGORY_GROUPS.findIndex((g) => g.id === groupIdFromBudgetKey(key));
+    return 1000 + CATEGORY_GROUPS.findIndex((g) => g.id === groupOfCategory(key)?.id);
+  };
+  const orderedBudgets = [...budgets].sort((a, b) => groupOrder(a.category) - groupOrder(b.category));
+
+  // For a group budget: how much of its limit is already promised to
+  // budgets on its own categories (same type), so the two can be compared.
+  const childBudgetTotal = (budget: CategoryBudget) => {
+    if (!isGroupBudgetKey(budget.category)) return 0;
+    const cats = new Set(categoriesForBudgetKey(budget.category));
+    const type = budget.budgetType || 'monthly';
+    return budgets
+      .filter((b) => cats.has(b.category) && (b.budgetType || 'monthly') === type)
+      .reduce((sum, b) => sum + ((type === 'yearly' ? b.yearlyLimit : b.monthlyLimit) || 0), 0);
+  };
 
   const getDateRangeLabel = () => {
     if (viewPeriod === 'month') {
@@ -227,7 +257,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <h2 className="font-display text-2xl font-semibold text-ink">Budgets</h2>
-          <p className="mt-0.5 text-sm text-slate">Set a limit per category and watch how close you're running.</p>
+          <p className="mt-0.5 text-sm text-slate">Set a limit on a category or a whole group and watch how close you're running.</p>
         </div>
         {!showAddForm && (
           <button
@@ -287,18 +317,63 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className={ledgerLabel}>Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value as CategoryType)}
-                className={ledgerInput}
-                disabled={saving}
-              >
-                <option value="">Select category…</option>
-                {availableCategories.map(cat => (
-                  <option key={cat} value={cat}>{CATEGORY_LABELS[cat] || cat}</option>
+            <div className="md:col-span-4">
+              <span className={ledgerLabel}>Budget for</span>
+              <div className="inline-flex p-0.5 rounded-lg border border-line bg-paper" role="radiogroup" aria-label="Budget for">
+                {(['category', 'group'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={target === t}
+                    disabled={saving || !!editingBudget}
+                    onClick={() => {
+                      setTarget(t);
+                      setSelectedCategory('');
+                    }}
+                    className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-60 ${
+                      target === t ? 'bg-surface text-ink shadow-sm' : 'text-slate hover:text-ink'
+                    }`}
+                  >
+                    {t === 'category' ? 'One category' : 'A whole group'}
+                  </button>
                 ))}
+              </div>
+              <p className="text-xs text-slate mt-1.5">
+                {target === 'group'
+                  ? 'A group budget caps everything in it — e.g. all of Dining & Takeout — alongside any budgets on its categories.'
+                  : 'Pick a single category, like Grocery or School Fees.'}
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="budget-target" className={ledgerLabel}>{target === 'group' ? 'Group' : 'Category'}</label>
+              <select
+                id="budget-target"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className={ledgerInput}
+                disabled={saving || !!editingBudget}
+              >
+                <option value="">{target === 'group' ? 'Select group…' : 'Select category…'}</option>
+                {target === 'group'
+                  ? CATEGORY_GROUPS.map((g) => {
+                      const key = groupBudgetKey(g.id);
+                      return (
+                        <option key={key} value={key} disabled={taken(key)}>
+                          {g.icon} {g.name}{taken(key) ? ' — has a budget' : ''}
+                        </option>
+                      );
+                    })
+                  : CATEGORY_GROUPS.map((g) => (
+                      <optgroup key={g.id} label={`${g.icon} ${g.name}`}>
+                        {g.categories.map((cat) => (
+                          <option key={cat} value={cat} disabled={taken(cat)}>
+                            {CATEGORY_LABELS[cat] || cat}{taken(cat) ? ' — has a budget' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
               </select>
             </div>
 
@@ -379,7 +454,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {budgets.map(budget => {
+            {orderedBudgets.map(budget => {
               // Calculate spending based on budget type and view period
               let spent = 0;
               let limit = 0;
@@ -392,14 +467,14 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
                 limit = budget.monthlyLimit || 0;
                 // Show monthly budgets when viewing month
                 if (viewPeriod === 'month') {
-                  spent = periodSpending[budget.category] || 0;
+                  spent = spentFor(budget.category);
                   shouldDisplay = true;
                 }
               } else if (budgetTypeValue === 'yearly') {
                 limit = budget.yearlyLimit || 0;
                 // Show yearly budgets when viewing year
                 if (viewPeriod === 'year') {
-                  spent = periodSpending[budget.category] || 0;
+                  spent = spentFor(budget.category);
                   shouldDisplay = true;
                 }
               }
@@ -408,16 +483,37 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
               
               const percentage = limit > 0 ? (spent / limit) * 100 : 0;
               const remaining = limit - spent;
+              const isGroup = isGroupBudgetKey(budget.category);
+              const group = isGroup ? getGroupById(groupIdFromBudgetKey(budget.category)) : groupOfCategory(budget.category);
+              const accent = group ? groupColor(group) : undefined;
+              const breakdown = isGroup
+                ? categoriesForBudgetKey(budget.category)
+                    .map((c) => ({ c, v: periodSpending[c as CategoryType] || 0 }))
+                    .filter((x) => x.v > 0)
+                    .sort((a, b) => b.v - a.v)
+                : [];
+              const promised = childBudgetTotal(budget);
 
               return (
-                <div key={budget.category} className="card-surface p-5">
+                <div
+                  key={budget.category}
+                  className="card-surface p-5"
+                  style={isGroup && accent ? { boxShadow: `inset 0 0 0 1.5px ${accent}66` } : undefined}
+                >
                   {/* Header */}
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <h4 className="font-display font-semibold text-ink text-base">
-                        {CATEGORY_LABELS[budget.category] || budget.category || 'Unknown'}
+                      <h4 className="font-display font-semibold text-ink text-base flex items-center gap-1.5">
+                        {group && <span aria-hidden="true">{group.icon}</span>}
+                        {isGroup ? group?.name ?? 'Deleted group' : CATEGORY_LABELS[budget.category as CategoryType] || budgetLabel(budget.category)}
                       </h4>
-                      <div className="mt-1.5 flex items-center gap-1.5">
+                      {!isGroup && group && <p className="text-[11px] text-slate">in {group.name}</p>}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {isGroup && (
+                          <span className="px-2 py-0.5 text-[11px] font-medium rounded-full font-mono text-paper" style={{ background: accent }}>
+                            Whole group
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 text-[11px] font-medium rounded-full bg-line/60 text-slate font-mono">
                           {(budget.budgetType || 'monthly') === 'monthly' ? 'Monthly' : 'Yearly'}
                         </span>
@@ -469,6 +565,34 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
                   </div>
                   <p className="text-[11px] text-slate font-mono text-right">{percentage.toFixed(0)}% used</p>
 
+                  {/* Group budgets: where the group's money went */}
+                  {isGroup && (
+                    <div className="mt-3 pt-3 border-t border-line space-y-1.5">
+                      {breakdown.length === 0 ? (
+                        <p className="text-xs text-slate">Nothing spent in this group yet.</p>
+                      ) : (
+                        breakdown.slice(0, 5).map(({ c, v }) => (
+                          <div key={c} className="text-xs">
+                            <div className="flex justify-between gap-2">
+                              <span className="text-ink truncate">{CATEGORY_LABELS[c as CategoryType] || budgetLabel(c)}</span>
+                              <span className="font-mono tabular text-slate">{formatCurrency(v)}</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-line/60 overflow-hidden mt-0.5">
+                              <div className="h-full rounded-full" style={{ width: `${limit > 0 ? Math.min(100, (v / limit) * 100) : 0}%`, background: accent }} />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                      {breakdown.length > 5 && <p className="text-[11px] text-slate">+{breakdown.length - 5} more categories</p>}
+                      {promised > 0 && (
+                        <p className={`text-[11px] font-mono ${promised > limit ? 'text-ember-strong dark:text-ember' : 'text-slate'}`}>
+                          Category budgets inside: {formatCurrency(promised)} of {formatCurrency(limit)}
+                          {promised > limit ? ' — more than the group limit' : ''}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Warning Messages */}
                   {percentage >= 100 && (
                     <div className="mt-3 p-2 bg-ember/10 rounded-md text-xs text-ember-strong dark:text-ember">
@@ -507,6 +631,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
         </h4>
         <ul className="space-y-1 text-slate list-disc list-inside marker:text-line">
           <li>Set realistic monthly or yearly limits based on income and typical spend</li>
+          <li>Use a group budget (e.g. all of Dining &amp; Takeout) when you don’t want to cap each category separately</li>
           <li>The alert threshold gives you warning before you go over</li>
           <li>Switch the period filter to check budgets for a different month or year</li>
           <li>Anything approaching its limit also shows up on the Dashboard</li>

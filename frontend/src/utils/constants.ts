@@ -3,6 +3,7 @@ import type { CategoryGroup, CategoryType } from '../types/index';
 
 export const CATEGORY_GROUPS: CategoryGroup[] = [
   {
+    id: 'groceries',
     name: 'Groceries',
     icon: '🛒',
     // Household grocery runs, whether at a store or via a quick-commerce
@@ -13,6 +14,7 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     color: '#6B8F71'
   },
   {
+    id: 'dining',
     name: 'Dining & Takeout',
     icon: '🍽️',
     // Eating out is not grocery shopping — split into its own group so
@@ -21,18 +23,21 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     color: '#B3492F'
   },
   {
+    id: 'transport',
     name: 'Fuel & Transportation',
     icon: '🚗',
     categories: ['fuel', 'public_transport', 'auto_rickshaw', 'vehicle_maintenance', 'vehicle_rto_fees', 'parking_fees'],
     color: '#5C7A8A'
   },
   {
+    id: 'home_bills',
     name: 'Home & Bills',
     icon: '🏠',
     categories: ['bills_power', 'bills_wifi', 'bills_mobile', 'bills_water', 'bills_lpg_gas', 'bills_dth_cable', 'mobile_recharge', 'rent_mortgage'],
     color: '#45B7D1'
   },
   {
+    id: 'shopping',
     name: 'Shopping',
     icon: '🛍️',
     // Retail purchases — clothing, electronics, and general online
@@ -41,36 +46,42 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     color: '#C9A66B'
   },
   {
+    id: 'lifestyle',
     name: 'Lifestyle & Entertainment',
     icon: '🎬',
     categories: ['entertainment', 'subscriptions', 'personal_care', 'fitness_gym', 'salon_beauty', 'tailor_alterations', 'laundry_dryclean'],
     color: '#7C6A9C'
   },
   {
+    id: 'medical',
     name: 'Medical Expenses',
     icon: '🏥',
     categories: ['medical_consultation', 'medical_medicines', 'medical_tests', 'medical_hospitalization', 'medical_insurance', 'medical_dental', 'medical_pharmacy', 'medical_emergency'],
     color: '#98D8C8'
   },
   {
+    id: 'gifting',
     name: 'Gifting & Donations',
     icon: '🎁',
     categories: ['gifting_personal', 'gifting_festivals', 'gifting_weddings', 'donations_charity', 'donations_religious'],
     color: '#8C5A5A'
   },
   {
+    id: 'agriculture',
     name: 'Agriculture & Farming',
     icon: '🌾',
     categories: ['agri_seeds_fertilizers', 'agri_seeds', 'agri_fertilizers', 'agri_pesticides', 'agri_equipment', 'agri_irrigation', 'agri_livestock', 'agri_labor', 'agri_fuel', 'agri_tractor_rental', 'agri_harvester_rental', 'agri_machinery_rental', 'agri_land_lease', 'agri_crop_insurance', 'agri_loan_interest', 'agri_storage_transport', 'agri_other'],
     color: '#82B74B'
   },
   {
+    id: 'education',
     name: 'Education',
     icon: '📚',
     categories: ['education', 'school_fees', 'tuition_classes'],
     color: '#9B59B6'
   },
   {
+    id: 'travel',
     name: 'Travel',
     icon: '✈️',
     // Broken out by what the money actually went to — flights, stay,
@@ -83,12 +94,14 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
     color: '#3E6E7E'
   },
   {
+    id: 'household_services',
     name: 'Household Services',
     icon: '🏡',
     categories: ['domestic_help_maid', 'domestic_help_cook', 'domestic_help_driver', 'home_repairs', 'home_furnishing'],
     color: '#D4A373'
   },
   {
+    id: 'financial_other',
     name: 'Financial & Others',
     icon: '💰',
     categories: ['insurance_general', 'investments_savings', 'pets', 'household_maintenance', 'other'],

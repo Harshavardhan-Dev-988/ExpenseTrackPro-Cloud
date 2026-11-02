@@ -14,8 +14,8 @@ import { addMonths, format, parseISO, startOfMonth } from 'date-fns';
 import type { CategoryBudget, CategoryStats, CategoryType, Expense } from '../../types';
 import { CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
 import { formatMoney } from '../../utils/helpers';
+import { budgetLabel } from '../../utils/categoryRegistry';
 import {
-  bucketSeries,
   budgetWindow,
   computeBudgetStatus,
   inPeriod,
@@ -24,7 +24,7 @@ import {
   type DashboardRange,
   type ResolvedPeriod,
 } from '../../utils/period';
-import LedgerLineChart from '../charts/LedgerLineChart';
+import TrendExplorer from '../charts/TrendExplorer';
 import CategoryPieChart from '../charts/CategoryPieChart';
 import PaymentMethodChart from '../charts/PaymentMethodChart';
 import WeekdaySpendingChart from '../charts/WeekdaySpendingChart';
@@ -338,7 +338,7 @@ function BudgetStrip({
                     : 'bg-brass/10 text-brass-strong dark:text-brass'
                 }`}
               >
-                {CATEGORY_LABELS[s.category] || s.category}
+                {budgetLabel(s.category).replace(' (whole group)', '')}
                 <span className="font-mono tabular">{Math.round(s.pct)}%</span>
               </span>
             ))}
@@ -412,11 +412,6 @@ export default function DashboardView({
     return { label: prev.label, prevTotal, change: ((total - prevTotal) / prevTotal) * 100 };
   }, [period, allExpenses, total]);
 
-  const series = useMemo(() => {
-    const end = period.end > now ? now : period.end;
-    return bucketSeries(expenses, period.start, end);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenses, period]);
 
   const budgetInfo = useMemo(() => {
     const win = budgetWindow(period);
@@ -445,7 +440,6 @@ export default function DashboardView({
   const budgetPct = budgetTotals.limit > 0 ? (budgetTotals.spent / budgetTotals.limit) * 100 : 0;
   const overCount = budgetInfo.statuses.filter((s) => s.state === 'exceeded').length;
   const closeCount = budgetInfo.statuses.filter((s) => s.state === 'warning').length;
-  const granularityLabel = series.granularity === 'day' ? 'Daily' : series.granularity === 'week' ? 'Weekly' : 'Monthly';
 
   return (
     <div id="dashboard-snapshot">
@@ -554,17 +548,14 @@ export default function DashboardView({
               </dl>
             </div>
             <div className="relative z-10">
-              <LedgerLineChart
-                data={series.points}
+              <TrendExplorer
+                expenses={expenses}
+                allExpenses={allExpenses}
+                period={period}
+                budgets={budgets}
                 currency={currency}
-                accent="pine"
-                height={220}
-                granularity={series.granularity}
-                ariaLabel={`${granularityLabel} spending for ${period.label}`}
+                height={240}
               />
-              <p className="mt-1 text-[11px] font-mono text-slate">
-                {granularityLabel} totals<span data-snapshot-exclude> · hover for detail</span>
-              </p>
             </div>
           </motion.section>
 
@@ -659,7 +650,7 @@ export default function DashboardView({
           {/* Supporting charts */}
           <div data-snapshot-block className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5 lg:items-stretch">
             <motion.div data-snapshot-block className="h-full" {...reveal(0.15)}>
-              <CategoryPieChart categoryStats={categoryStats.filter((s) => s.total > 0)} currency={currency} compact />
+              <CategoryPieChart categoryStats={categoryStats.filter((s) => s.total > 0)} currency={currency} compact onSelectCategory={onSelectCategory} />
             </motion.div>
             <div className="h-full flex flex-col gap-5">
               <motion.div data-snapshot-block {...reveal(0.2)}>
