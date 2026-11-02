@@ -535,12 +535,12 @@ export function generateExpenseReport({ allExpenses, budgets, period, currency, 
   // ---- budgets ------------------------------------------------------------------
   if (sections.budgets && budgets.some((b) => b.isActive)) {
     const win = budgetWindow(period);
-    const statuses = computeBudgetStatus(budgets, inPeriod(allExpenses, win.start, win.end), win.months);
+    const statuses = computeBudgetStatus(budgets, allExpenses, win);
     if (statuses.length) {
       const over = statuses.filter((s) => s.state === 'exceeded').length;
       w.sectionTitle(
         'Budgets',
-        `Limits scaled to ${win.phrase}  |  ${over} of ${statuses.length} over limit`
+        `Limits scaled to ${win.phrase}${statuses.some((s) => s.scope === 'year') ? ' (yearly budgets: whole year)' : ''}  |  ${over} of ${statuses.length} over limit`
       );
       w.table(
         [
@@ -556,7 +556,7 @@ export function generateExpenseReport({ allExpenses, budgets, period, currency, 
           },
         ],
         statuses.map((s) => [
-          budgetLabel(s.category),
+          s.scope === 'year' ? `${budgetLabel(s.category)} (${s.scopeLabel})` : budgetLabel(s.category),
           money(s.limit, { decimals: 0 }),
           money(s.spent, { decimals: 0 }),
           `${s.pct.toFixed(0)}%`,

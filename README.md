@@ -485,7 +485,7 @@ Shared by the dashboard and the PDF report so they always agree:
 - `resolvePeriod` turns the dashboard range (`today | month | year | all | custom`) into concrete dates and labels.
 - `previousPeriod` gives the comparison window — like-for-like for a running month/year (Oct 1–9 vs Sep 1–9).
 - `bucketSeries` groups the trend by day (≤ 62 days), week (≤ 400 days) or month.
-- `budgetWindow` + `computeBudgetStatus` scale budgets to the period (a ₹13,000/month budget over a quarter is ₹39,000; "today" is judged against the current month).
+- `budgetWindow` + `computeBudgetStatus` scale monthly budgets to the period (a ₹13,000/month budget over a quarter is ₹39,000; "today" is judged against the current month). A **yearly** budget viewed over less than a year is judged on its calendar year so far against the full yearly limit, never prorated to a month — otherwise a once-a-year payment (insurance, school fees) would show as many times over budget the month it is paid.
 
 ### Design system
 

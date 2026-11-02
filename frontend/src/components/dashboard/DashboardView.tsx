@@ -301,6 +301,10 @@ function BudgetStrip({
   const flagged = statuses.filter((s) => s.state !== 'ok');
   const over = flagged.filter((s) => s.state === 'exceeded').length;
   const close = flagged.length - over;
+  // Yearly budgets are judged on their whole year (see computeBudgetStatus);
+  // say so in the headline when they're all that's flagged, else per chip.
+  const allYearly = flagged.length > 0 && flagged.every((s) => s.scope === 'year');
+  const headline = allYearly ? flagged[0].scopeLabel : phrase;
   const [dismissedFor, setDismissedFor] = useState<string | null>(null);
   if (!flagged.length || dismissedFor === phrase) return null;
 
@@ -325,13 +329,13 @@ function BudgetStrip({
             {over > 0 && `${over} budget${over === 1 ? '' : 's'} over limit`}
             {over > 0 && close > 0 && ', '}
             {close > 0 && `${close} getting close`}
-            <span className="font-normal text-slate"> · {phrase}</span>
+            <span className="font-normal text-slate"> · {headline}</span>
           </p>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {flagged.slice(0, 4).map((s) => (
               <span
                 key={s.category}
-                title={`${formatMoney(s.spent, currency)} of ${formatMoney(s.limit, currency)}`}
+                title={`${formatMoney(s.spent, currency)} of ${formatMoney(s.limit, currency)} ${s.scopeLabel}${s.scope === 'year' ? ' (yearly budget)' : ''}`}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
                   s.state === 'exceeded'
                     ? 'bg-ember/10 text-ember-strong dark:text-ember'
@@ -340,6 +344,7 @@ function BudgetStrip({
               >
                 {budgetLabel(s.category).replace(' (whole group)', '')}
                 <span className="font-mono tabular">{Math.round(s.pct)}%</span>
+                {s.scope === 'year' && !allYearly && <span className="opacity-70">{s.scopeLabel}</span>}
               </span>
             ))}
             {flagged.length > 4 && <span className="text-[11px] text-slate self-center">+{flagged.length - 4} more</span>}
@@ -415,7 +420,7 @@ export default function DashboardView({
 
   const budgetInfo = useMemo(() => {
     const win = budgetWindow(period);
-    const statuses = computeBudgetStatus(budgets, inPeriod(allExpenses, win.start, win.end), win.months);
+    const statuses = computeBudgetStatus(budgets, allExpenses, win);
     return { statuses, phrase: win.phrase };
   }, [budgets, allExpenses, period]);
 

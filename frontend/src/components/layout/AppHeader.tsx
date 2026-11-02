@@ -16,7 +16,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ExportFormat } from '../../hooks/useExportActions';
 import { NAV_ITEMS, type View } from './nav';
-import AccountMenu, { type AccountStats } from './AccountMenu';
+import AccountSummary, { Avatar, type AccountStats } from './AccountMenu';
 import type { UserProfile } from '../../hooks/useUserProfile';
 
 
@@ -85,9 +85,10 @@ const VIEW_ICONS: Record<View, ReactNode> = {
 // ---------------------------------------------------------------------------
 // Shared menu content (used by both the desktop dropdown and mobile drawer)
 // ---------------------------------------------------------------------------
-interface MenuContentProps
-  extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense' | 'profile' | 'accountStats' | 'currency'> {
+interface MenuContentProps extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense'> {
   close: () => void;
+  /** Phone drawer: the section links, between the account block and the actions. */
+  sections?: ReactNode;
 }
 
 function MenuItem({
@@ -147,6 +148,10 @@ function MenuContent({
   onToggleTheme,
   onSignOut,
   onManageCategories,
+  profile,
+  accountStats,
+  currency,
+  sections,
 }: MenuContentProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const run = (fn: () => void) => () => {
@@ -156,6 +161,10 @@ function MenuContent({
 
   return (
     <div className="py-1">
+      <div className="px-1 pt-0.5 pb-1">
+        <AccountSummary profile={profile} stats={accountStats} currency={currency} onWhatsApp={run(onWhatsApp)} />
+      </div>
+      {sections}
       <MenuSectionLabel>Your data</MenuSectionLabel>
       <MenuItem iconNode={ICONS.import} hint="CSV, Excel or JSON file" onSelect={run(onImport)}>
         Import expenses
@@ -325,7 +334,7 @@ export default function AppHeader(props: AppHeaderProps) {
             <span className="leading-tight">
               <span className="block text-lg font-display font-semibold text-ink">ExpenseTrack Pro</span>
               <span className="block md:hidden text-[11px] text-slate font-mono uppercase tracking-wide">{currentLabel}</span>
-              <span className="hidden md:block lg:hidden xl:block text-[11px] text-slate font-mono uppercase tracking-wide">
+              <span className="hidden 2xl:block text-[11px] text-slate font-mono uppercase tracking-wide">
                 Your household ledger
               </span>
             </span>
@@ -336,17 +345,18 @@ export default function AppHeader(props: AppHeaderProps) {
             <SectionTabs currentView={currentView} onNavigate={onNavigate} />
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onAddExpense}
-              className="inline-flex items-center justify-center gap-2 h-10 px-3 sm:px-4 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200"
+              className="inline-flex items-center justify-center gap-2 h-10 px-3 sm:px-4 rounded-lg bg-pine text-paper text-sm font-semibold whitespace-nowrap shadow-ledger hover:bg-pine-strong active:scale-[0.98] transition-all duration-200"
               aria-label="Add expense"
             >
               {ICONS.plus}
               <span className="hidden sm:inline">Add expense</span>
             </button>
 
+            {/* One control for the menu and the account: ☰ + avatar. */}
             <div className="relative">
               <button
                 ref={menuButtonRef}
@@ -354,13 +364,14 @@ export default function AppHeader(props: AppHeaderProps) {
                 onClick={toggle}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen || drawerOpen}
-                aria-label="Open menu"
-                className={`inline-flex items-center justify-center gap-2 h-10 px-2.5 lg:px-3 rounded-lg border text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
-                  menuOpen ? 'border-pine text-pine-strong dark:text-pine bg-surface' : 'border-line bg-surface text-ink hover:border-pine hover:text-pine-strong'
+                aria-label={props.profile ? `Menu and account: ${props.profile.displayName}` : 'Menu and account'}
+                title={props.profile ? `${props.profile.displayName} · ${props.profile.email}` : 'Menu'}
+                className={`inline-flex items-center gap-2 h-10 pl-3 pr-1 rounded-full border bg-surface transition-all duration-200 active:scale-[0.98] ${
+                  menuOpen ? 'border-pine text-pine-strong dark:text-pine shadow-ledger' : 'border-line text-ink hover:border-pine/60 hover:shadow-ledger'
                 }`}
               >
-                {menuOpen ? ICONS.close : ICONS.menu}
-                <span className="hidden lg:inline">Menu</span>
+                <span className="text-slate">{menuOpen ? ICONS.close : ICONS.menu}</span>
+                <Avatar profile={props.profile} size={32} />
               </button>
 
               <AnimatePresence>
@@ -368,27 +379,18 @@ export default function AppHeader(props: AppHeaderProps) {
                   <motion.div
                     ref={menuRef}
                     role="menu"
-                    aria-label="More actions"
+                    aria-label="Menu and account"
                     initial={{ opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12 } }}
                     transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute right-0 top-full mt-2 w-[300px] max-h-[calc(100vh-96px)] overflow-y-auto card-surface shadow-ledger-lg p-1.5 origin-top-right z-50"
+                    className="absolute right-0 top-full mt-2 w-[330px] max-h-[calc(100vh-96px)] overflow-y-auto card-surface shadow-ledger-lg p-1.5 origin-top-right z-50"
                   >
                     <MenuContent {...props} close={closeMenu} />
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-
-            <AccountMenu
-              profile={props.profile}
-              stats={props.accountStats}
-              currency={props.currency}
-              onManageCategories={props.onManageCategories}
-              onWhatsApp={props.onWhatsApp}
-              onSignOut={props.onSignOut}
-            />
           </div>
         </div>
 
@@ -435,33 +437,40 @@ export default function AppHeader(props: AppHeaderProps) {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-2 pb-6">
-                <MenuSectionLabel>Sections</MenuSectionLabel>
-                <nav aria-label="Sections" className="space-y-0.5">
-                  {NAV_ITEMS.map((item) => {
-                    const active = currentView === item.key;
-                    return (
-                      <button
-                        key={item.key}
-                        type="button"
-                        onClick={() => {
-                          onNavigate(item.key);
-                          closeDrawer();
-                        }}
-                        aria-current={active ? 'page' : undefined}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          active ? 'bg-pine/10 text-pine-strong dark:text-pine' : 'text-ink hover:bg-paper'
-                        }`}
-                      >
-                        <span className={active ? '' : 'text-slate'}>{VIEW_ICONS[item.key]}</span>
-                        {item.label}
-                        {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-pine" aria-hidden="true" />}
-                      </button>
-                    );
-                  })}
-                </nav>
-                <div className="my-2 border-t border-line" />
-                <MenuContent {...props} close={closeDrawer} />
+              <div className="flex-1 overflow-y-auto px-2 pt-2 pb-6">
+                <MenuContent
+                  {...props}
+                  close={closeDrawer}
+                  sections={
+                    <>
+                      <MenuSectionLabel>Sections</MenuSectionLabel>
+                      <nav aria-label="Sections" className="space-y-0.5">
+                        {NAV_ITEMS.map((item) => {
+                          const active = currentView === item.key;
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => {
+                                onNavigate(item.key);
+                                closeDrawer();
+                              }}
+                              aria-current={active ? 'page' : undefined}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                                active ? 'bg-pine/10 text-pine-strong dark:text-pine' : 'text-ink hover:bg-paper'
+                              }`}
+                            >
+                              <span className={active ? '' : 'text-slate'}>{VIEW_ICONS[item.key]}</span>
+                              {item.label}
+                              {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-pine" aria-hidden="true" />}
+                            </button>
+                          );
+                        })}
+                      </nav>
+                      <div className="my-2 border-t border-line" />
+                    </>
+                  }
+                />
               </div>
             </motion.aside>
           </div>

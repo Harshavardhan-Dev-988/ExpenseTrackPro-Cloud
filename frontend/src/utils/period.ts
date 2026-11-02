@@ -189,10 +189,20 @@ export interface BudgetStatus {
   /** The budget's key: a category id, or "group:<id>" for a whole group. */
   category: CategoryBudget['category'];
   spent: number;
-  /** The budget's limit scaled to the period being looked at. */
+  /** The limit the spend is measured against (see `scope`). */
   limit: number;
   pct: number;
   state: BudgetState;
+  /**
+   * What `spent` and `limit` cover. 'period': the range being viewed, with
+   * the limit scaled to it. 'year': a yearly budget viewed over less than a
+   * year is judged on its own calendar year so far against the full yearly
+   * limit — not prorated to a month, which would flag a once-a-year payment
+   * (insurance, school fees) as 10× over the moment it's paid.
+   */
+  scope: 'period' | 'year';
+  /** e.g. "this month" or "in 2026", for labels and tooltips. */
+  scopeLabel: string;
 }
 
 /**
@@ -210,20 +220,43 @@ export function budgetWindow(period: ResolvedPeriod, now = new Date()): { start:
   return { start: period.start, end: period.end, months: Math.max(1, period.days / 30.4375), phrase: period.phrase };
 }
 
-export function computeBudgetStatus(budgets: CategoryBudget[], expensesInWindow: Expense[], months: number): BudgetStatus[] {
-  const spentBy = new Map<string, number>();
-  expensesInWindow.forEach((e) => spentBy.set(e.category, (spentBy.get(e.category) || 0) + e.amount));
+export function computeBudgetStatus(
+  budgets: CategoryBudget[],
+  allExpenses: Expense[],
+  win: { start: Date; end: Date; months: number; phrase: string }
+): BudgetStatus[] {
+  const sumByCategory = (list: Expense[]) => {
+    const m = new Map<string, number>();
+    list.forEach((e) => m.set(e.category, (m.get(e.category) || 0) + e.amount));
+    return m;
+  };
+  const inWindow = sumByCategory(inPeriod(allExpenses, win.start, win.end));
+  const yearStart = startOfYear(win.end);
+  let inYear: Map<string, number> | null = null; // only computed if a yearly budget needs it
 
   return budgets
     .filter((b) => b.isActive)
-    .map((budget) => {
+    .map((budget): BudgetStatus => {
       const type = budget.budgetType || 'monthly';
-      const base = type === 'yearly' ? (budget.yearlyLimit || 0) / 12 : budget.monthlyLimit || 0;
-      const limit = base * months;
-      const spent = categoriesForBudgetKey(budget.category).reduce((sum, c) => sum + (spentBy.get(c) || 0), 0);
+      const cats = categoriesForBudgetKey(budget.category);
+      let limit: number;
+      let spentBy = inWindow;
+      let scope: BudgetStatus['scope'] = 'period';
+      let scopeLabel = win.phrase;
+      if (type === 'yearly' && win.months < 12) {
+        inYear ??= sumByCategory(inPeriod(allExpenses, yearStart, endOfYear(yearStart)));
+        spentBy = inYear;
+        limit = budget.yearlyLimit || 0;
+        scope = 'year';
+        scopeLabel = `in ${format(yearStart, 'yyyy')}`;
+      } else {
+        const perMonth = type === 'yearly' ? (budget.yearlyLimit || 0) / 12 : budget.monthlyLimit || 0;
+        limit = perMonth * win.months;
+      }
+      const spent = cats.reduce((sum, c) => sum + (spentBy.get(c) || 0), 0);
       const pct = limit > 0 ? (spent / limit) * 100 : 0;
       const state: BudgetState = pct >= 100 ? 'exceeded' : pct >= (budget.alertThreshold || 80) ? 'warning' : 'ok';
-      return { budget, category: budget.category, spent, limit, pct, state };
+      return { budget, category: budget.category, spent, limit, pct, state, scope, scopeLabel };
     })
     .filter((s) => s.limit > 0)
     .sort((a, b) => b.pct - a.pct);

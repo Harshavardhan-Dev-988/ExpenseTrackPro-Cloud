@@ -1,11 +1,9 @@
 /**
- * The signed-in user, top right: an initials avatar that opens an account
- * panel — who you are, how you signed in, a few facts about your ledger,
- * WhatsApp link status, and the account actions.
+ * The signed-in user: the initials avatar (also used on the header's menu
+ * button) and the account block shown at the top of that menu.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import cloudApi from '../../services/cloudApi';
@@ -20,13 +18,12 @@ export interface AccountStats {
   customCategories: number;
 }
 
-interface AccountMenuProps {
+interface AccountSummaryProps {
   profile: UserProfile | null;
   stats: AccountStats;
   currency: string;
-  onManageCategories: () => void;
+  /** Opens WhatsApp setup (the caller closes the menu first). */
   onWhatsApp: () => void;
-  onSignOut: () => void;
 }
 
 const METHOD_LABEL: Record<UserProfile['method'], string> = {
@@ -74,42 +71,27 @@ export function Avatar({ profile, size = 36 }: { profile: UserProfile | null; si
   );
 }
 
-export default function AccountMenu({ profile, stats, currency, onManageCategories, onWhatsApp, onSignOut }: AccountMenuProps) {
-  const [open, setOpen] = useState(false);
+/**
+ * The account block at the top of the header menu (desktop dropdown and
+ * phone drawer): who you are, a few facts about your ledger, and — one
+ * click away — the account details.
+ */
+export default function AccountSummary({ profile, stats, currency, onWhatsApp }: AccountSummaryProps) {
+  const [showDetails, setShowDetails] = useState(false);
   const [wa, setWa] = useState<{ linked: boolean; phoneNumber?: string } | null | 'error'>(null);
   const [copied, setCopied] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!showDetails || wa !== null) return;
     let cancelled = false;
     cloudApi
       .getWhatsAppStatus()
       .then((s) => !cancelled && setWa(s))
       .catch(() => !cancelled && setWa('error'));
-    const onPointer = (e: MouseEvent) => {
-      if (!panelRef.current?.contains(e.target as Node) && !buttonRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    };
-    document.addEventListener('mousedown', onPointer);
-    document.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
-      document.removeEventListener('mousedown', onPointer);
-      document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
-
-  const run = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
+  }, [showDetails, wa]);
 
   const copyId = async () => {
     if (!profile) return;
@@ -123,124 +105,103 @@ export default function AccountMenu({ profile, stats, currency, onManageCategori
   };
 
   return (
-    <>
+    <div className="rounded-xl bg-paper/70 border border-line overflow-hidden">
+      {/* Identity */}
+      <div className="p-3.5 flex items-center gap-3">
+        <Avatar profile={profile} size={44} />
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-base font-semibold text-ink leading-tight truncate">{profile?.displayName ?? '—'}</p>
+          <p className="text-xs text-slate truncate">{profile?.email || 'No email on this account'}</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {profile && <MethodBadge method={profile.method} />}
+            {profile?.emailVerified && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-pine-strong dark:text-pine bg-pine/10 rounded-full px-2 py-0.5">
+                ✓ Verified
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Ledger facts */}
+      <div className="grid grid-cols-3 gap-px bg-line border-t border-line">
+        <Fact label="Entries" value={stats.entries.toLocaleString('en-IN')} />
+        <Fact label="This month" value={formatMoney(Math.round(stats.thisMonth), currency)} />
+        <Fact label="Since" value={stats.firstEntry ? format(stats.firstEntry, 'MMM yyyy') : '—'} />
+      </div>
+
       <button
-        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={profile ? `Account: ${profile.displayName}` : 'Account'}
-        className={`flex items-center gap-2 h-10 rounded-full pl-0.5 pr-0.5 xl:pr-3 border transition-colors ${
-          open ? 'border-pine bg-surface' : 'border-transparent hover:border-line hover:bg-surface'
-        }`}
+        onClick={() => setShowDetails((v) => !v)}
+        aria-expanded={showDetails}
+        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium text-slate hover:text-ink border-t border-line transition-colors"
       >
-        <Avatar profile={profile} />
-        <span className="hidden xl:block text-left leading-tight max-w-[10rem]">
-          <span className="block text-sm font-medium text-ink truncate">{profile?.displayName ?? 'Account'}</span>
-          <span className="block text-[11px] text-slate truncate">{profile?.email}</span>
-        </span>
+        Account details
+        <svg
+          className={`w-3.5 h-3.5 transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
-
-      {createPortal(
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              ref={panelRef}
-              role="dialog"
-              aria-label="Your account"
-              initial={{ opacity: 0, y: -6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.98, transition: { duration: 0.12 } }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed z-[65] top-[68px] right-3 sm:right-6 w-[min(calc(100vw-24px),360px)] max-h-[calc(100vh-84px)] overflow-y-auto card-surface shadow-ledger-lg origin-top-right"
-            >
-              {/* Identity */}
-              <div className="p-4 flex items-start gap-3 border-b border-line">
-                <Avatar profile={profile} size={52} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-lg font-semibold text-ink leading-tight truncate">{profile?.displayName ?? '—'}</p>
-                  <p className="text-sm text-slate truncate">{profile?.email || 'No email on this account'}</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {profile && <MethodBadge method={profile.method} />}
-                    {profile?.emailVerified && (
-                      <span className="inline-flex items-center gap-1 text-xs text-pine-strong dark:text-pine bg-pine/10 rounded-full px-2 py-0.5">
-                        ✓ Verified
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Ledger facts */}
-              <div className="grid grid-cols-2 gap-px bg-line border-b border-line">
-                <Fact label="Entries" value={stats.entries.toLocaleString('en-IN')} />
-                <Fact label="This month" value={formatMoney(stats.thisMonth, currency)} />
-                <Fact
-                  label="Ledger since"
-                  value={stats.firstEntry ? format(stats.firstEntry, 'MMM yyyy') : '—'}
-                  hint={stats.firstEntry ? formatDistanceToNowStrict(stats.firstEntry) : undefined}
-                />
-                <Fact
-                  label="Categories used"
-                  value={String(stats.categoriesUsed)}
-                  hint={stats.customCategories ? `${stats.customCategories} of your own` : undefined}
-                />
-              </div>
-
-              {/* Details */}
-              <dl className="px-4 py-3 space-y-2 text-sm border-b border-line">
-                <Row label="Signed in">
-                  {profile?.signedInAt ? `${formatDistanceToNowStrict(profile.signedInAt)} ago` : '—'}
-                </Row>
-                {profile?.linkedAt && <Row label={`${METHOD_LABEL[profile.method]} linked`}>{format(profile.linkedAt, 'd MMM yyyy')}</Row>}
-                <Row label="WhatsApp">
-                  {wa === null ? (
-                    <span className="text-slate">checking…</span>
-                  ) : wa === 'error' ? (
-                    <span className="text-slate">unavailable</span>
-                  ) : wa.linked ? (
-                    <span className="text-pine-strong dark:text-pine">Linked · {wa.phoneNumber}</span>
-                  ) : (
-                    <button type="button" onClick={run(onWhatsApp)} className="text-pine-strong dark:text-pine underline underline-offset-2">
-                      Not linked — set up
-                    </button>
-                  )}
-                </Row>
-                <Row label="Data region">Sydney · ap-southeast-2</Row>
-                <Row label="User ID">
-                  <button
-                    type="button"
-                    onClick={copyId}
-                    className="font-mono text-xs text-slate hover:text-ink select-all"
-                    title="Copy user ID (useful when asking for support)"
-                  >
-                    {copied ? 'copied' : profile ? `${profile.userId.slice(0, 8)}…` : '—'}
+      <AnimatePresence initial={false}>
+        {showDetails && (
+          <motion.dl
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="px-3.5 pb-3 pt-1 space-y-1.5 text-xs">
+              <Row label="Signed in">
+                {profile?.signedInAt ? `${formatDistanceToNowStrict(profile.signedInAt)} ago` : '—'}
+              </Row>
+              {profile?.linkedAt && <Row label={`${METHOD_LABEL[profile.method]} linked`}>{format(profile.linkedAt, 'd MMM yyyy')}</Row>}
+              <Row label="Categories used">
+                {stats.categoriesUsed}
+                {stats.customCategories ? ` · ${stats.customCategories} your own` : ''}
+              </Row>
+              <Row label="WhatsApp">
+                {wa === null ? (
+                  <span className="text-slate">checking…</span>
+                ) : wa === 'error' ? (
+                  <span className="text-slate">unavailable</span>
+                ) : wa.linked ? (
+                  <span className="text-pine-strong dark:text-pine">Linked · {wa.phoneNumber}</span>
+                ) : (
+                  <button type="button" onClick={onWhatsApp} className="text-pine-strong dark:text-pine underline underline-offset-2">
+                    Not linked — set up
                   </button>
-                </Row>
-              </dl>
-
-              {/* Actions */}
-              <div className="p-1.5">
-                <ActionButton onClick={run(onManageCategories)}>Manage categories</ActionButton>
-                <ActionButton onClick={run(onWhatsApp)}>WhatsApp logging</ActionButton>
-                <div className="my-1 border-t border-line" />
-                <ActionButton tone="danger" onClick={run(onSignOut)}>Sign out</ActionButton>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-    </>
+                )}
+              </Row>
+              <Row label="Data region">Sydney · ap-southeast-2</Row>
+              <Row label="User ID">
+                <button
+                  type="button"
+                  onClick={copyId}
+                  className="font-mono text-[11px] text-slate hover:text-ink select-all"
+                  title="Copy user ID (useful when asking for support)"
+                >
+                  {copied ? 'copied' : profile ? `${profile.userId.slice(0, 8)}…` : '—'}
+                </button>
+              </Row>
+            </div>
+          </motion.dl>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-surface px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-slate font-mono">{label}</p>
-      <p className="font-display text-lg font-semibold text-ink tabular leading-tight">{value}</p>
+    <div className="bg-surface px-3 py-2">
+      <p className="text-[9.5px] uppercase tracking-wider text-slate font-mono">{label}</p>
+      <p className="font-display text-sm font-semibold text-ink tabular leading-tight truncate">{value}</p>
       {hint && <p className="text-[11px] text-slate">{hint}</p>}
     </div>
   );
@@ -252,19 +213,5 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <dt className="text-slate">{label}</dt>
       <dd className="text-ink text-right min-w-0 truncate">{children}</dd>
     </div>
-  );
-}
-
-function ActionButton({ children, onClick, tone }: { children: ReactNode; onClick: () => void; tone?: 'danger' }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        tone === 'danger' ? 'text-ember-strong dark:text-ember hover:bg-ember/8' : 'text-ink hover:bg-paper'
-      }`}
-    >
-      {children}
-    </button>
   );
 }
