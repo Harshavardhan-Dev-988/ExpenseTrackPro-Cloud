@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import type { CategoryType, PaymentMethod, Expense } from '../../types';
+import type { CategoryType, PaymentMethod, Expense, Split } from '../../types';
+import SplitEditor, { type SplitValue } from '../splits/SplitEditor';
+import { splitTotal } from '../splits/splitMath';
 import { CATEGORY_GROUPS, CATEGORY_LABELS, PAYMENT_METHOD_LABELS } from '../../utils/constants';
 import cloudApi from '../../services/cloudApi';
 import Spinner from '../ui/Spinner';
@@ -27,6 +29,8 @@ interface ExpenseFormProps {
     paymentMethod?: PaymentMethod;
     tags?: string[];
     receiptUrl?: string;
+    paidBy?: string;
+    split?: Split;
   }) => Promise<void>;
   onCancel: () => void;
 }
@@ -69,6 +73,7 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
   const [existingReceiptKey, setExistingReceiptKey] = useState<string | undefined>(undefined);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+  const [splitValue, setSplitValue] = useState<SplitValue>({});
   const amountRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
@@ -91,6 +96,7 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
       setTags(expense.tags?.join(', ') || '');
       setShowTags(!!expense.tags?.length);
       setExistingReceiptKey(expense.receiptUrl);
+      setSplitValue({ paidBy: expense.paidBy, split: expense.split });
       setReceiptFile(null);
       setReceiptPreviewUrl(null);
     } else {
@@ -184,6 +190,11 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
     if (!date) newErrors.date = 'Add a date';
     if (!amount || parseFloat(amount) <= 0) newErrors.amount = 'Add an amount';
     if (!description.trim()) newErrors.description = 'Say what this was for';
+    if (splitValue.split) {
+      if (!splitValue.split.shares.length) newErrors.split = 'Pick who shares this expense';
+      else if (Math.abs(splitTotal(splitValue.split) - parseFloat(amount || '0')) > 0.01)
+        newErrors.split = 'The shares need to add up to the amount';
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -215,7 +226,10 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
         paymentMethod,
         tags: tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
         receiptUrl,
+        paidBy: splitValue.paidBy,
+        split: splitValue.split,
       });
+      setSplitValue({});
       setDate(new Date().toISOString().split('T')[0]);
       setAmount('');
       setCategory('grocery');
@@ -473,6 +487,14 @@ export default function ExpenseForm({ expense, initialCategory, onSubmit, onCanc
               />
               {errors.description && <p className="text-ember text-xs mt-1.5">{errors.description}</p>}
             </div>
+
+            {/* Who paid / split — household members or anyone else */}
+            <SplitEditor
+              amount={parseFloat(amount) || 0}
+              value={splitValue}
+              onChange={setSplitValue}
+              error={errors.split}
+            />
 
             {/* Tags — optional, tucked away until asked for */}
             {showTags ? (

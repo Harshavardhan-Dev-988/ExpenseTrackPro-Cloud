@@ -13,7 +13,8 @@ import {
   isGroupBudgetKey,
 } from '../../utils/categoryRegistry';
 import { cloudApi as db } from '../../services/cloudApi';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { isFinancialYear, yearEnd, yearLabel, yearOf, yearStart } from '../../utils/period';
 import BudgetAlerts from './BudgetAlerts';
 import { useToast, errorMessage } from '../ui/toastContext';
 import { useConfirm } from '../ui/confirmContext';
@@ -40,7 +41,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
   // Filter state for viewing budgets
   const [viewPeriod, setViewPeriod] = useState<'month' | 'year'>('month');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
+  const [selectedYear, setSelectedYear] = useState(String(yearOf(new Date())));
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -191,9 +192,10 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
         return expenseDate >= start && expenseDate <= end;
       });
     } else {
+      // A household on the financial year (Apr–Mar) sees FY 2026–27 here.
       const year = parseInt(selectedYear);
-      const start = startOfYear(new Date(year, 0, 1));
-      const end = endOfYear(new Date(year, 0, 1));
+      const start = yearStart(year);
+      const end = yearEnd(year);
       return expenses.filter(e => {
         const expenseDate = new Date(e.date);
         return expenseDate >= start && expenseDate <= end;
@@ -235,7 +237,7 @@ export default function BudgetsView({ onBudgetsUpdate, expenses }: BudgetsViewPr
       const [year, month] = selectedMonth.split('-').map(Number);
       return format(new Date(year, month - 1, 1), 'MMMM yyyy');
     } else {
-      return `Year ${selectedYear}`;
+      return isFinancialYear() ? yearLabel(parseInt(selectedYear)) : `Year ${selectedYear}`;
     }
   };
 

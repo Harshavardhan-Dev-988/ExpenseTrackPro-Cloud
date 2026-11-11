@@ -61,7 +61,7 @@ class LocalApiBundling:
             check=True,
         )
 
-        skip = {"requirements.txt", "__pycache__", ".venv", "venv", ".pytest_cache"}
+        skip = {"requirements.txt", "requirements-dev.txt", "pytest.ini", "tests", "__pycache__", ".venv", "venv", ".pytest_cache"}
         for item in self._source_dir.iterdir():
             if item.name in skip:
                 continue

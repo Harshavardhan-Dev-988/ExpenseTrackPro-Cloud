@@ -11,7 +11,20 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import budgets, categories, expenses, health, receipts, savings, settings, whatsapp
+from routers import (
+    budgets,
+    categories,
+    expenses,
+    health,
+    ledgers,
+    notifications,
+    receipts,
+    recurring,
+    savings,
+    settings,
+    splits,
+    whatsapp,
+)
 
 
 def _allowed_origins() -> list[str]:
@@ -29,7 +42,7 @@ def _allowed_origins() -> list[str]:
     ]
 
 
-app = FastAPI(title="ExpenseTrack Pro API", version="0.1.0")
+app = FastAPI(title="ExpenseTrack Pro API", version="2.0.0")
 
 # Redundant with the HTTP API's own CORS config once deployed, but needed
 # for local `uvicorn` development, where nothing else sets these headers.
@@ -42,6 +55,10 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(ledgers.router)
+app.include_router(recurring.router)
+app.include_router(splits.router)
+app.include_router(notifications.router)
 app.include_router(expenses.router)
 app.include_router(settings.router)
 app.include_router(savings.router)

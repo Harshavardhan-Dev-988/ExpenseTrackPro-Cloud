@@ -21,6 +21,9 @@ import {
   inPeriod,
   previousPeriod,
   sumAmount,
+  isFinancialYear,
+  yearLabel,
+  yearOf,
   type DashboardRange,
   type ResolvedPeriod,
 } from '../../utils/period';
@@ -43,7 +46,8 @@ interface DashboardViewProps {
   budgets: CategoryBudget[];
   categoryStats: CategoryStats[];
   currency: string;
-  onAddExpense: () => void;
+  /** Absent for view-only members: no add buttons. */
+  onAddExpense?: () => void;
   onEditExpense: (expense: Expense) => void;
   onSelectCategory: (category: CategoryType) => void;
   onOpenPdf: () => void;
@@ -135,7 +139,8 @@ function PeriodToolbar({
 }) {
   const now = new Date();
   const monthValue = range.month || format(now, 'yyyy-MM');
-  const yearValue = Number(range.year || now.getFullYear());
+  const currentYear = yearOf(now);
+  const yearValue = Number(range.year || currentYear);
   const stepMonth = (delta: number) =>
     onRangeChange({ type: 'month', month: format(addMonths(parseISO(`${monthValue}-01`), delta), 'yyyy-MM') });
   const atCurrentMonth = monthValue >= format(now, 'yyyy-MM');
@@ -148,7 +153,7 @@ function PeriodToolbar({
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [earliest, monthValue]);
-  const atCurrentYear = yearValue >= now.getFullYear();
+  const atCurrentYear = yearValue >= currentYear;
   const input =
     'h-9 px-2.5 text-sm border border-line rounded-lg bg-surface text-ink focus:outline-none focus:border-pine font-mono tabular';
   const stepBtn =
@@ -177,7 +182,7 @@ function PeriodToolbar({
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                   />
                 )}
-                <span className="relative z-10">{label}</span>
+                <span className="relative z-10">{type === 'year' && isFinancialYear() ? 'FY' : label}</span>
               </button>
             );
           })}
@@ -217,9 +222,9 @@ function PeriodToolbar({
               className={`${input} flex-1 sm:flex-none`}
               aria-label="Year"
             >
-              {Array.from({ length: 10 }, (_, i) => now.getFullYear() - i).map((y) => (
+              {Array.from({ length: 10 }, (_, i) => currentYear - i).map((y) => (
                 <option key={y} value={y}>
-                  {y}
+                  {yearLabel(y)}
                 </option>
               ))}
             </select>
@@ -493,12 +498,14 @@ export default function DashboardView({
               : 'Pick a different period, or add an expense for this one.'}
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <button
-              onClick={onAddExpense}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong transition-colors"
-            >
-              Add expense
-            </button>
+            {onAddExpense && (
+              <button
+                onClick={onAddExpense}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-pine text-paper text-sm font-semibold shadow-ledger hover:bg-pine-strong transition-colors"
+              >
+                Add expense
+              </button>
+            )}
             {allExpenses.length > 0 && range.type !== 'all' && (
               <button
                 onClick={() => onRangeChange({ type: 'all' })}
@@ -642,7 +649,7 @@ export default function DashboardView({
               title="Recent activity"
               subtitle="Latest entries in this period · tap to edit"
               delay={0.1}
-              action={
+              action={onAddExpense &&
                 <button data-snapshot-exclude onClick={onAddExpense} className="text-xs font-medium text-pine hover:text-pine-strong transition-colors whitespace-nowrap">
                   + Add
                 </button>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Expense, FilterOptions } from '../types';
 import db from '../services/cloudApi';
-import { generateId } from '../utils/helpers';
+import { SYNCED_EVENT } from '../services/offline';
 
 /**
  * The expense list, loaded once from the API and then kept in sync locally.
@@ -76,20 +76,19 @@ export const useExpenses = (filters?: FilterOptions) => {
     loadExpenses('initial');
   }, [loadExpenses]);
 
+  // Expenses added offline were just sent: reload to swap in their real ids.
+  useEffect(() => {
+    const onSynced = () => loadExpenses('refresh').catch(() => undefined);
+    window.addEventListener(SYNCED_EVENT, onSynced);
+    return () => window.removeEventListener(SYNCED_EVENT, onSynced);
+  }, [loadExpenses]);
+
   const addExpense = useCallback(async (expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const expense: Expense = {
-      ...expenseData,
-      id: generateId(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    // The API assigns the real id (it ignores the one we send), so keep
-    // the server's — otherwise editing/deleting this entry before the next
-    // full reload would target an id the server has never heard of.
-    const serverId = await db.addExpense(expense);
-    const saved: Expense = { ...expense, id: serverId };
+    // The server assigns the id and records who added it; keep its copy so
+    // editing/deleting this entry before the next reload targets the right id.
+    const saved = await db.createExpense(expenseData);
     setExpenses((prev) => [...prev, saved]);
-    return serverId;
+    return saved.id;
   }, []);
 
   const addExpenses = useCallback(

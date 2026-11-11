@@ -40,7 +40,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 import db
-from dependencies.auth import get_user_id
+import keys as K
+from dependencies.auth import Identity, get_user_id
+from routers.expenses import expense_item
+from services import ledgers as L
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
@@ -157,11 +160,21 @@ def _parse_expense_message(text: str) -> Optional[dict]:
 # ---- Linking (signed-in half) ------------------------------------------
 
 def _link_code_pk(code: str) -> str:
-    return f"LINKCODE#{code}"
+    return K.link_code_pk(code)
 
 
-def _whatsapp_pk(phone_number: str) -> str:
-    return f"WHATSAPP#{phone_number}"
+def _target_ledger(user_id: str) -> str | None:
+    """Texts are logged into the user's default household, or the first
+    one where they can add expenses."""
+    profile = L.ensure_user(Identity(user_id=user_id))
+    mine = {m["ledgerId"]: m.get("role") for m in L.memberships(user_id)}
+    default = profile.get("defaultLedgerId")
+    if default and mine.get(default) in ("owner", "editor"):
+        return default
+    for lid, role in mine.items():
+        if role in ("owner", "editor"):
+            return lid
+    return None
 
 
 @router.post("/link-code", response_model=LinkCodeResponse)
@@ -169,13 +182,16 @@ def create_link_code(user_id: str = Depends(get_user_id)):
     code = "".join(secrets.choice(LINK_CODE_ALPHABET) for _ in range(LINK_CODE_LENGTH))
     now = int(time.time())
     db.put_item(
-        {
-            "PK": _link_code_pk(code),
-            "SK": "PENDING",
-            "userId": user_id,
-            "createdAt": now,
-            "ttl": now + LINK_CODE_TTL_SECONDS,
-        }
+        db.stamp(
+            {
+                "PK": _link_code_pk(code),
+                "SK": "PENDING",
+                "userId": user_id,
+                "createdAt": now,
+                "ttl": now + LINK_CODE_TTL_SECONDS,
+            },
+            K.T_LINK_CODE,
+        )
     )
     return LinkCodeResponse(
         code=code,
@@ -186,7 +202,7 @@ def create_link_code(user_id: str = Depends(get_user_id)):
 
 @router.get("/status", response_model=WhatsAppStatusResponse)
 def get_status(user_id: str = Depends(get_user_id)):
-    link = db.get_item(db.user_pk(user_id), "WHATSAPP_LINK")
+    link = db.get_item(K.user_pk(user_id), K.WHATSAPP)
     if not link:
         return WhatsAppStatusResponse(linked=False)
     return WhatsAppStatusResponse(linked=True, phoneNumber=link.get("phoneNumber"))
@@ -194,10 +210,10 @@ def get_status(user_id: str = Depends(get_user_id)):
 
 @router.delete("/link", status_code=204)
 def unlink(user_id: str = Depends(get_user_id)):
-    link = db.get_item(db.user_pk(user_id), "WHATSAPP_LINK")
+    link = db.get_item(K.user_pk(user_id), K.WHATSAPP)
     if link and link.get("phoneNumber"):
-        db.delete_item(_whatsapp_pk(link["phoneNumber"]), "LINK")
-    db.delete_item(db.user_pk(user_id), "WHATSAPP_LINK")
+        db.delete_item(K.phone_pk(link["phoneNumber"]), "LINK")
+    db.delete_item(K.user_pk(user_id), K.WHATSAPP)
 
 
 # ---- Webhook (Twilio-authenticated half) --------------------------------
@@ -227,14 +243,12 @@ async def webhook(request: Request):
                 "ExpenseTrack Pro → Link WhatsApp in the app."
             )
         user_id = code_item["userId"]
-        db.put_item({"PK": _whatsapp_pk(phone_number), "SK": "LINK", "userId": user_id})
-        db.put_item(
-            {"PK": db.user_pk(user_id), "SK": "WHATSAPP_LINK", "phoneNumber": phone_number}
-        )
+        db.put_item(db.stamp({"PK": K.phone_pk(phone_number), "SK": "LINK", "userId": user_id}, K.T_PHONE))
+        db.put_item(db.stamp({"PK": K.user_pk(user_id), "SK": K.WHATSAPP, "phoneNumber": phone_number}, K.T_WHATSAPP))
         db.delete_item(_link_code_pk(code), "PENDING")
         return _twiml("✅ This WhatsApp number is now linked to your ExpenseTrack Pro account. Try texting an expense, e.g. ‘150 auto’.")
 
-    link = db.get_item(_whatsapp_pk(phone_number), "LINK")
+    link = db.get_item(K.phone_pk(phone_number), "LINK")
     if not link:
         return _twiml(
             "This number isn't linked to an ExpenseTrack Pro account yet. "
@@ -252,20 +266,26 @@ async def webhook(request: Request):
         )
 
     user_id = link["userId"]
+    ledger_id = _target_ledger(user_id)
+    if not ledger_id:
+        return _twiml("You only have view access to your households, so this couldn't be logged.")
+    profile = L.get_profile(user_id) or {}
     expense_id = str(uuid.uuid4())
     now_iso = datetime.now(timezone.utc).isoformat()
     expense = {
-        "PK": db.user_pk(user_id),
-        "SK": f"EXPENSE#{expense_id}",
         "id": expense_id,
         "date": now_iso,
         "amount": parsed["amount"],
         "category": parsed["category"],
         "description": parsed["description"],
+        "paymentMethod": None,
+        "createdBy": user_id,
+        "createdByName": profile.get("name") or "WhatsApp",
+        "tags": ["whatsapp"],
         "createdAt": now_iso,
         "updatedAt": now_iso,
     }
-    db.put_item(expense)
+    db.put_item(expense_item(ledger_id, expense))
 
     return _twiml(
         f"Logged ₹{parsed['amount']:g} · {parsed['category'].replace('_', ' ')}. "

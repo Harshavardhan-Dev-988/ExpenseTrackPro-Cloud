@@ -1,26 +1,17 @@
 """Storage for ExpenseTrack Pro: one DynamoDB table, one S3 bucket.
 
-Table design (single-table, per Section 5 of the roadmap doc):
-  PK = "USER#<userId>"          SK = "SETTINGS"              -> a user's settings
-  PK = "USER#<userId>"          SK = "EXPENSE#<expenseId>"   -> one expense
-  PK = "USER#<userId>"          SK = "SAVINGS_ENTRY#<id>"    -> one savings entry
-  PK = "USER#<userId>"          SK = "SAVINGS_GOAL#<id>"     -> one savings goal
-  PK = "USER#<userId>"          SK = "WHATSAPP_LINK"          -> {phoneNumber} (phase 4:
-                                                                 reverse lookup for the
-                                                                 app's own "linked/unlink" UI)
-  PK = "WHATSAPP#<e164number>"  SK = "LINK"                  -> {userId} (phase 4:
-                                                                 looks up who a text
-                                                                 came from, no GSI needed)
-  PK = "LINKCODE#<code>"        SK = "PENDING"                -> {userId, ttl} (phase 4:
-                                                                 a one-time code minted from
-                                                                 the app, redeemed by texting
-                                                                 "LINK <code>" from WhatsApp;
-                                                                 expires via the table's TTL)
+Schema v2 (the full key design is in backend/api/keys.py and
+docs/data-model.md): data belongs to a *ledger* (household), so a family
+can share one. Two overloaded secondary indexes cover every other read:
 
-Every query the app makes is "give me one partition" (a user's items, or one
-phone number's link), so no secondary indexes are needed yet — see the
-roadmap's "Data model & migration" section for why DynamoDB was chosen over a
-relational database.
+  GSI1  lookups   USER#<sub> -> their ledgers, INVITE#<email> -> invites,
+                  LEDGERS -> every ledger (jobs), DUE#<month> -> recurring
+                  rules by due date, LEDGER#<lid>#SPLIT -> split expenses
+  GSI2  by date   LEDGER#<lid>#EXP / #SAVE -> expenses / savings in date order
+
+The v1 table (per-user partitions, no indexes) is kept, read-only and
+retained, until the v2 migration has been verified in every stage; the
+migration itself runs automatically after deploy (see api_stack.py).
 """
 import aws_cdk as cdk
 from aws_cdk import aws_dynamodb as dynamodb
@@ -36,20 +27,48 @@ class DataStack(cdk.Stack):
 
         removal_policy = cdk.RemovalPolicy.DESTROY if stage != "prod" else cdk.RemovalPolicy.RETAIN
 
-        self.table = dynamodb.TableV2(
+        # v1 table — no longer written to. Kept (and retained even outside
+        # prod) as the migration's source and the rollback path; remove it
+        # in a later release once v2 is confirmed in every stage.
+        self.legacy_table = dynamodb.TableV2(
             self,
             "Table",
             table_name=f"expense-track-pro-{stage}",
             partition_key=dynamodb.Attribute(name="PK", type=dynamodb.AttributeType.STRING),
             sort_key=dynamodb.Attribute(name="SK", type=dynamodb.AttributeType.STRING),
-            billing=dynamodb.Billing.on_demand(),  # pay-per-request: scales to zero, no capacity to size
+            billing=dynamodb.Billing.on_demand(),
             point_in_time_recovery=(stage == "prod"),
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+            time_to_live_attribute="ttl",
+        )
+
+        string = dynamodb.AttributeType.STRING
+        self.table = dynamodb.TableV2(
+            self,
+            "LedgerTable",
+            table_name=f"expense-track-pro-v2-{stage}",
+            partition_key=dynamodb.Attribute(name="PK", type=string),
+            sort_key=dynamodb.Attribute(name="SK", type=string),
+            global_secondary_indexes=[
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI1",
+                    partition_key=dynamodb.Attribute(name="GSI1PK", type=string),
+                    sort_key=dynamodb.Attribute(name="GSI1SK", type=string),
+                ),
+                dynamodb.GlobalSecondaryIndexPropsV2(
+                    index_name="GSI2",
+                    partition_key=dynamodb.Attribute(name="GSI2PK", type=string),
+                    sort_key=dynamodb.Attribute(name="GSI2SK", type=string),
+                ),
+            ],
+            billing=dynamodb.Billing.on_demand(),  # pay-per-request: scales to zero, no capacity to size
+            # Point-in-time recovery everywhere: 35 days of restore points
+            # for a few cents, worth it for household money data.
+            point_in_time_recovery=True,
+            deletion_protection=(stage == "prod"),
             removal_policy=removal_policy,
-            # Only WhatsApp link codes (phase 4) set this attribute today -
-            # a short-lived one-time code that should disappear on its own
-            # a few minutes after it expires, rather than living forever as
-            # dead rows. Every other item type simply never sets `ttl`, so
-            # this has no effect on them.
+            # Invites, link codes, outbox emails and "already notified"
+            # markers expire on their own.
             time_to_live_attribute="ttl",
         )
 
@@ -76,4 +95,5 @@ class DataStack(cdk.Stack):
         )
 
         cdk.CfnOutput(self, "TableName", value=self.table.table_name)
+        cdk.CfnOutput(self, "LegacyTableName", value=self.legacy_table.table_name)
         cdk.CfnOutput(self, "ReceiptsBucketName", value=self.receipts_bucket.bucket_name)

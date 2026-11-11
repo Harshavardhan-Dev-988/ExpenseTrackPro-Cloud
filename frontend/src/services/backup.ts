@@ -1,6 +1,7 @@
 import { cloudApi as db } from './cloudApi';
-import type { Expense, CategoryBudget, Settings, CategoryType, CustomCategoryData } from '../types';
+import type { Expense, CategoryBudget, Settings, CategoryType, CustomCategoryData, RecurringInput, RecurringRule } from '../types';
 import { CATEGORY_LABELS } from '../utils/constants';
+import { omit } from '../utils/omit';
 
 export interface BackupData {
   version: string;
@@ -11,6 +12,8 @@ export interface BackupData {
     settings: Settings | null;
     /** The user's own groups and categories (added in backup format 1.1). */
     customCategories?: CustomCategoryData;
+    /** Recurring expense rules (added in backup format 1.2). */
+    recurring?: RecurringInput[];
   };
   metadata: {
     expenseCount: number;
@@ -22,8 +25,15 @@ export interface BackupData {
   };
 }
 
+function toRecurringInput(r: RecurringRule): RecurringInput {
+  return omit(r, ['id', 'nextDue', 'lastLoggedDue', 'createdBy', 'createdAt', 'updatedAt']);
+}
+
+const sameRule = (a: RecurringInput, b: RecurringInput) =>
+  a.description.trim().toLowerCase() === b.description.trim().toLowerCase() && a.amount === b.amount && a.frequency === b.frequency;
+
 /**
- * Export all data from IndexedDB as a backup file
+ * Export all of the current household's data as a backup file
  */
 export async function exportBackup(): Promise<BackupData> {
   try {
@@ -32,6 +42,7 @@ export async function exportBackup(): Promise<BackupData> {
     const budgets = await db.getAllBudgets();
     const settings = (await db.getSettings()) ?? null;
     const customCategories = await db.getCustomCategories().catch(() => ({ groups: [], categories: [] }));
+    const recurring = (await db.listRecurring().catch(() => [] as RecurringRule[])).map(toRecurringInput);
 
     // Calculate metadata
     const dates = expenses.map(e => new Date(e.date).getTime()).filter(d => !isNaN(d));
@@ -39,13 +50,14 @@ export async function exportBackup(): Promise<BackupData> {
     const latest = dates.length > 0 ? new Date(Math.max(...dates)).toISOString() : null;
 
     const backup: BackupData = {
-      version: '1.1',
+      version: '1.2',
       exportDate: new Date().toISOString(),
       data: {
         expenses,
         budgets,
         settings,
         customCategories,
+        recurring,
       },
       metadata: {
         expenseCount: expenses.length,
@@ -134,6 +146,9 @@ export async function importBackup(
       onProgress?.('clearing', 0, 0);
       await db.clearAllExpenses((done, total) => onProgress?.('clearing', done, total));
       await db.clearAllBudgets();
+      for (const rule of await db.listRecurring().catch(() => [] as RecurringRule[])) {
+        await db.deleteRecurring(rule.id);
+      }
     }
 
     // Custom groups/categories first, so restored expenses that use them
@@ -183,6 +198,17 @@ export async function importBackup(
       await db.saveBudget(budget);
       importedBudgets++;
       onProgress?.('budgets', importedBudgets, backup.data.budgets.length);
+    }
+
+    // Recurring rules: recreated; their schedule starts from today, so
+    // nothing in the past is logged again. Merge skips ones already here.
+    const rules = backup.data.recurring ?? [];
+    if (rules.length) {
+      const existing = mode === 'merge' ? await db.listRecurring().catch(() => [] as RecurringRule[]) : [];
+      for (const rule of rules) {
+        if (existing.some((e) => sameRule(e, rule))) continue;
+        await db.createRecurring(rule).catch((err) => console.warn('Skipped a recurring rule:', err));
+      }
     }
 
     // Import settings

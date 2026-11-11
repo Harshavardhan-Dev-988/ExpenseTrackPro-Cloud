@@ -1,15 +1,33 @@
 {
+  "id": "/",
   "name": "ExpenseTrack Pro",
   "short_name": "ExpenseTrack",
   "description": "A household ledger for Indian families: expenses, budgets and savings in one place.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#EEF1EE",
   "theme_color": "#2F4D3F",
+  "categories": ["finance", "productivity"],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add expense",
+      "short_name": "Add",
+      "description": "Log a new expense",
+      "url": "/?action=add",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Recurring expenses",
+      "short_name": "Recurring",
+      "url": "/?action=recurring",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

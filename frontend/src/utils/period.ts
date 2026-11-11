@@ -6,21 +6,18 @@
 import { categoriesForBudgetKey } from './categoryRegistry';
 import {
   addDays,
+  addYears,
   differenceInCalendarDays,
   endOfDay,
   endOfMonth,
-  endOfYear,
   format,
   isSameMonth,
-  isSameYear,
   parseISO,
   startOfDay,
   startOfMonth,
   startOfWeek,
-  startOfYear,
   subDays,
   subMonths,
-  subYears,
 } from 'date-fns';
 import type { CategoryBudget, Expense } from '../types';
 
@@ -47,6 +44,38 @@ export interface ResolvedPeriod {
 
 const ts = (e: Expense) => new Date(e.date).getTime();
 
+// ---------------------------------------------------------------------------
+// Which month a "year" starts in: January (calendar year) or April (the
+// Indian financial year, Apr–Mar). A household setting (Settings.yearStart),
+// applied app-wide by useSettings via setYearStart().
+// ---------------------------------------------------------------------------
+let yearStartMonth = 0;
+
+export function setYearStart(start: 'jan' | 'apr' | string | undefined): void {
+  yearStartMonth = start === 'apr' ? 3 : 0;
+}
+
+export const isFinancialYear = () => yearStartMonth === 3;
+
+/** The year (by its first calendar year) that a date falls in: 2026 for
+ * 10 Feb 2027 when the year starts in April. */
+export function yearOf(d: Date): number {
+  return d.getMonth() >= yearStartMonth ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+export function yearStart(year: number): Date {
+  return new Date(year, yearStartMonth, 1);
+}
+
+export function yearEnd(year: number): Date {
+  return endOfDay(subDays(addYears(yearStart(year), 1), 1));
+}
+
+/** "2026", or "FY 2026–27" for a financial year. */
+export function yearLabel(year: number): string {
+  return yearStartMonth === 0 ? String(year) : `FY ${year}–${String(year + 1).slice(2)}`;
+}
+
 export function resolvePeriod(range: DashboardRange, expenses: Expense[], now = new Date()): ResolvedPeriod {
   const make = (type: RangeType, start: Date, end: Date, label: string, phrase: string): ResolvedPeriod => ({
     type,
@@ -66,9 +95,11 @@ export function resolvePeriod(range: DashboardRange, expenses: Expense[], now = 
       return make('month', startOfMonth(anchor), endOfMonth(anchor), label, isSameMonth(anchor, now) ? 'this month' : label);
     }
     case 'year': {
-      const anchor = range.year ? new Date(Number(range.year), 0, 1) : now;
-      const label = format(anchor, 'yyyy');
-      return make('year', startOfYear(anchor), endOfYear(anchor), label, isSameYear(anchor, now) ? 'this year' : label);
+      const year = range.year ? Number(range.year) : yearOf(now);
+      const label = yearLabel(year);
+      const current = year === yearOf(now);
+      return make('year', yearStart(year), yearEnd(year), label,
+        current ? (isFinancialYear() ? 'this financial year' : 'this year') : label);
     }
     case 'custom': {
       const times = expenses.map(ts);
@@ -128,12 +159,13 @@ export function previousPeriod(period: ResolvedPeriod, now = new Date()): { star
       return { start: prevStart, end: endOfMonth(prevStart), label: format(prevStart, 'MMMM yyyy') };
     }
     case 'year': {
-      const prevStart = startOfYear(subYears(period.start, 1));
-      if (isSameYear(period.start, now)) {
+      const prevYear = yearOf(period.start) - 1;
+      const prevStart = yearStart(prevYear);
+      if (now >= period.start && now <= period.end) {
         const dayCount = differenceInCalendarDays(now, period.start);
-        return { start: prevStart, end: endOfDay(addDays(prevStart, dayCount)), label: `same point in ${format(prevStart, 'yyyy')}` };
+        return { start: prevStart, end: endOfDay(addDays(prevStart, dayCount)), label: `same point in ${yearLabel(prevYear)}` };
       }
-      return { start: prevStart, end: endOfYear(prevStart), label: format(prevStart, 'yyyy') };
+      return { start: prevStart, end: yearEnd(prevYear), label: yearLabel(prevYear) };
     }
     case 'custom': {
       const end = endOfDay(subDays(period.start, 1));
@@ -231,7 +263,7 @@ export function computeBudgetStatus(
     return m;
   };
   const inWindow = sumByCategory(inPeriod(allExpenses, win.start, win.end));
-  const yearStart = startOfYear(win.end);
+  const budgetYear = yearOf(win.end);
   let inYear: Map<string, number> | null = null; // only computed if a yearly budget needs it
 
   return budgets
@@ -244,11 +276,11 @@ export function computeBudgetStatus(
       let scope: BudgetStatus['scope'] = 'period';
       let scopeLabel = win.phrase;
       if (type === 'yearly' && win.months < 12) {
-        inYear ??= sumByCategory(inPeriod(allExpenses, yearStart, endOfYear(yearStart)));
+        inYear ??= sumByCategory(inPeriod(allExpenses, yearStart(budgetYear), yearEnd(budgetYear)));
         spentBy = inYear;
         limit = budget.yearlyLimit || 0;
         scope = 'year';
-        scopeLabel = `in ${format(yearStart, 'yyyy')}`;
+        scopeLabel = `in ${yearLabel(budgetYear)}`;
       } else {
         const perMonth = type === 'yearly' ? (budget.yearlyLimit || 0) / 12 : budget.monthlyLimit || 0;
         limit = perMonth * win.months;

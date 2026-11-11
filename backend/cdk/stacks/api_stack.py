@@ -3,6 +3,12 @@ HTTP API whose built-in Cognito authorizer checks every request's JWT before
 it ever reaches the Lambda — so no route in the FastAPI app has to verify
 auth itself; it just trusts the `userId` the authorizer attaches to the
 request (see api/dependencies/auth.py).
+
+Alongside it:
+  * a jobs Lambda (same code, jobs_handler.py) run by EventBridge schedules
+    for recurring expenses, budget alerts and monthly summary emails;
+  * a migration Lambda (migrate_handler.py) that a CDK Trigger runs after
+    every deploy, applying any new data migration exactly once.
 """
 import os
 
@@ -12,8 +18,12 @@ from aws_cdk import aws_apigatewayv2_authorizers as apigwv2_authorizers
 from aws_cdk import aws_apigatewayv2_integrations as apigwv2_integrations
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_dynamodb as dynamodb
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_lambda as _lambda
 from aws_cdk import aws_s3 as s3
+from aws_cdk import triggers
 from constructs import Construct
 
 from .local_bundling import LocalApiBundling
@@ -37,6 +47,12 @@ TWILIO_AUTH_TOKEN_SECRET_NAME = "expense-track-pro/twilio-auth-token"
 # business-verified one).
 TWILIO_WHATSAPP_NUMBER = "+17372508034"
 
+# Email (SES). Off until the app has its own domain: the jobs then write
+# each email to the household's OUTBOX for preview instead of sending.
+# To switch on: verify the domain in SES (and leave the SES sandbox), then
+# set both in cdk.json context ("emailFrom": "ExpenseTrack Pro
+# <hello@example.com>", "emailEnabled": true) and redeploy this stack.
+
 
 class ApiStack(cdk.Stack):
     def __init__(
@@ -48,11 +64,32 @@ class ApiStack(cdk.Stack):
         user_pool: cognito.UserPool,
         user_pool_client: cognito.UserPoolClient,
         table: dynamodb.TableV2,
+        legacy_table: dynamodb.TableV2,
         receipts_bucket: s3.Bucket,
         site: SiteConfig,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        code = _lambda.Code.from_asset(
+            API_DIR,
+            bundling=cdk.BundlingOptions(
+                # `image` is required by the type but is only reached if
+                # `local.try_bundle` returns False — it never is here.
+                image=_lambda.Runtime.PYTHON_3_12.bundling_image,
+                local=LocalApiBundling(API_DIR),
+            ),
+        )
+        email_from = self.node.try_get_context("emailFrom") or ""
+        email_enabled = bool(self.node.try_get_context("emailEnabled")) and bool(email_from)
+        app_url = site.custom_origin or "https://d3bttra9tv41h7.cloudfront.net"
+        shared_env = {
+            "TABLE_NAME": table.table_name,
+            "STAGE": stage,
+            "APP_URL": app_url,
+            "EMAIL_ENABLED": "true" if email_enabled else "false",
+            "EMAIL_FROM": email_from,
+        }
 
         fn = _lambda.Function(
             self,
@@ -60,21 +97,12 @@ class ApiStack(cdk.Stack):
             runtime=_lambda.Runtime.PYTHON_3_12,
             architecture=_lambda.Architecture.X86_64,
             handler="lambda_handler.handler",
-            code=_lambda.Code.from_asset(
-                API_DIR,
-                bundling=cdk.BundlingOptions(
-                    # `image` is required by the type but is only reached if
-                    # `local.try_bundle` returns False — it never is here.
-                    image=_lambda.Runtime.PYTHON_3_12.bundling_image,
-                    local=LocalApiBundling(API_DIR),
-                ),
-            ),
+            code=code,
             timeout=cdk.Duration.seconds(15),
             memory_size=256,
             environment={
-                "TABLE_NAME": table.table_name,
+                **shared_env,
                 "RECEIPTS_BUCKET_NAME": receipts_bucket.bucket_name,
-                "STAGE": stage,
                 "TWILIO_AUTH_TOKEN": cdk.SecretValue.secrets_manager(
                     TWILIO_AUTH_TOKEN_SECRET_NAME
                 ).unsafe_unwrap(),
@@ -85,6 +113,55 @@ class ApiStack(cdk.Stack):
         )
         table.grant_read_write_data(fn)
         receipts_bucket.grant_read_write(fn)
+
+        # ---- scheduled jobs --------------------------------------------------
+        jobs_fn = _lambda.Function(
+            self,
+            "JobsFunction",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            architecture=_lambda.Architecture.X86_64,
+            handler="jobs_handler.handler",
+            code=code,
+            timeout=cdk.Duration.minutes(5),
+            memory_size=256,
+            environment=shared_env,
+        )
+        table.grant_read_write_data(jobs_fn)
+        jobs_fn.add_to_role_policy(
+            iam.PolicyStatement(actions=["ses:SendEmail"], resources=["*"])
+        )
+        # Times are UTC; comments give India time (UTC+5:30).
+        for job, schedule, label in (
+            ("recurring", events.Schedule.cron(minute="0", hour="19"), "00:30 IST daily"),
+            ("budget_alerts", events.Schedule.cron(minute="30", hour="14"), "20:00 IST daily"),
+            ("monthly_summary", events.Schedule.cron(minute="30", hour="3", day="1"), "09:00 IST on the 1st"),
+        ):
+            events.Rule(
+                self,
+                f"Job-{job}",
+                description=f"ExpenseTrack Pro {job} job ({label})",
+                schedule=schedule,
+                targets=[targets.LambdaFunction(jobs_fn, event=events.RuleTargetInput.from_object({"job": job}),
+                                                retry_attempts=2)],
+            )
+
+        # ---- data migrations ---------------------------------------------------
+        # Runs migrations/ after each deploy; each one applies once per table.
+        migrate_fn = triggers.TriggerFunction(
+            self,
+            "MigrateFunction",
+            runtime=_lambda.Runtime.PYTHON_3_12,
+            architecture=_lambda.Architecture.X86_64,
+            handler="migrate_handler.handler",
+            code=code,
+            timeout=cdk.Duration.minutes(15),
+            memory_size=512,
+            environment={**shared_env, "LEGACY_TABLE_NAME": legacy_table.table_name},
+            execute_after=[fn],
+            execute_on_handler_change=True,
+        )
+        table.grant_read_write_data(migrate_fn)
+        legacy_table.grant_read_data(migrate_fn)
 
         authorizer = apigwv2_authorizers.HttpUserPoolAuthorizer(
             "CognitoAuthorizer",
@@ -105,7 +182,7 @@ class ApiStack(cdk.Stack):
                     apigwv2.CorsHttpMethod.DELETE,
                     apigwv2.CorsHttpMethod.OPTIONS,
                 ],
-                allow_headers=["Authorization", "Content-Type"],
+                allow_headers=["Authorization", "Content-Type", "X-Ledger-Id"],
             ),
             default_authorizer=authorizer,
         )
@@ -153,5 +230,6 @@ class ApiStack(cdk.Stack):
 
         self.api_url = http_api.api_endpoint
         self.fn = fn
+        self.jobs_fn = jobs_fn
         self.http_api = http_api
         cdk.CfnOutput(self, "ApiUrl", value=http_api.api_endpoint)

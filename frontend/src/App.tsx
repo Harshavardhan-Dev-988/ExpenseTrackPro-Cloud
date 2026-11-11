@@ -21,6 +21,15 @@ import WhatsAppLink from './components/whatsapp/WhatsAppLink';
 import PDFReportGenerator from './components/reports/PDFReportGenerator';
 import SavingsTracker from './components/savings/SavingsTracker';
 import CategoryManager from './components/categories/CategoryManager';
+import HouseholdPanel from './components/household/HouseholdPanel';
+import InviteBanner from './components/household/InviteBanner';
+import OfflineBanner from './components/ui/OfflineBanner';
+import { useHousehold } from './components/household/householdContext';
+import RecurringManager from './components/recurring/RecurringManager';
+import DueSoon from './components/recurring/DueSoon';
+import SplitsPanel from './components/splits/SplitsPanel';
+import NotificationsPanel from './components/notifications/NotificationsPanel';
+import type { Split } from './types';
 import { useCategories } from './components/categories/categoriesContext';
 import { useUserProfile } from './hooks/useUserProfile';
 import Spinner from './components/ui/Spinner';
@@ -57,17 +66,34 @@ function loadRange(): DashboardRange {
   return { type: 'month' };
 }
 
+// Home-screen shortcuts (site.webmanifest) open the app at /?action=add or
+// /?action=recurring; read once, then tidy the address bar.
+function takeUrlAction(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
+  if (action || params.has('source')) window.history.replaceState(null, '', window.location.pathname);
+  return action;
+}
+
 function App() {
+  const [urlAction] = useState(takeUrlAction);
+  const household = useHousehold();
+  const { canEdit } = household;
   const toast = useToast();
   const confirm = useConfirm();
 
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(urlAction === 'add' && canEdit);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [showBackupRestore, setShowBackupRestore] = useState(false);
   const [showWhatsAppLink, setShowWhatsAppLink] = useState(false);
   const [showPDFGenerator, setShowPDFGenerator] = useState(false);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showHousehold, setShowHousehold] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(urlAction === 'recurring');
+  const [showSplits, setShowSplits] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [recurringVersion, setRecurringVersion] = useState(0);
   const profile = useUserProfile();
   const { data: customCategoryData, reload: reloadCategories } = useCategories();
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -177,8 +203,25 @@ function App() {
     };
   }, [expenses, currentMonthSpending, customCategoryData]);
 
-  // Dashboard period → filtered expenses
-  const dashboardPeriod = useMemo(() => resolvePeriod(dashboardRange, expenses), [dashboardRange, expenses]);
+  // Recurring expenses logged automatically when this household opened.
+  useEffect(() => {
+    if (household.autoLogged > 0) {
+      toast.info(
+        `${household.autoLogged} recurring ${household.autoLogged === 1 ? 'expense' : 'expenses'} logged`,
+        'Rent, salaries and other regulars that fell due.'
+      );
+    }
+    // once per household open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Dashboard period → filtered expenses. yearStart: "Year" may mean the
+  // Indian financial year (Apr–Mar), a household setting.
+  const yearStartSetting = settings.yearStart;
+  const dashboardPeriod = useMemo(() => {
+    void yearStartSetting;
+    return resolvePeriod(dashboardRange, expenses);
+  }, [dashboardRange, expenses, yearStartSetting]);
   const dashboardExpenses = useMemo(
     () => inPeriod(expenses, dashboardPeriod.start, dashboardPeriod.end),
     [expenses, dashboardPeriod]
@@ -247,6 +290,8 @@ function App() {
     paymentMethod?: PaymentMethod;
     tags?: string[];
     receiptUrl?: string;
+    paidBy?: string;
+    split?: Split;
   }) => {
     // Errors propagate to ExpenseForm, which shows them inline and keeps
     // the form open so nothing typed is lost.
@@ -255,26 +300,32 @@ function App() {
       toast.success('Changes saved', `${money(expenseData.amount)} · ${expenseData.description}`);
       setEditingExpense(null);
     } else {
-      await addExpense(expenseData);
-      toast.success('Entry recorded', `${money(expenseData.amount)} · ${expenseData.description}`);
+      const id = await addExpense(expenseData);
+      if (id.startsWith('offline-')) toast.info('Saved offline', "It'll be sent as soon as you're back online.");
+      else toast.success('Entry recorded', `${money(expenseData.amount)} · ${expenseData.description}`);
     }
     setShowExpenseForm(false);
     setQuickAddCategory(undefined);
   };
 
   const handleEditExpense = (expense: Expense) => {
+    if (!canEdit) return viewOnly();
     setSelectedCategory(null);
     setEditingExpense(expense);
     setShowExpenseForm(true);
   };
 
+  const viewOnly = () => toast.info('View-only access', `You can look around ${household.ledger.name}, but not change it.`);
+
   const openAddExpenseForm = (category?: CategoryType) => {
+    if (!canEdit) return viewOnly();
     setEditingExpense(null);
     setQuickAddCategory(category);
     setShowExpenseForm(true);
   };
 
   const requestDeleteExpense = async (expense: Expense) => {
+    if (!canEdit) return viewOnly();
     const deleted = await confirm({
       title: 'Delete this expense?',
       message: "It'll be removed from your ledger, totals and budgets. This can't be undone.",
@@ -416,12 +467,19 @@ function App() {
         onToggleTheme={toggleTheme}
         onSignOut={handleSignOut}
         onManageCategories={() => setShowCategoryManager(true)}
+        onHousehold={() => setShowHousehold(true)}
+        onRecurring={() => setShowRecurring(true)}
+        onSplits={() => setShowSplits(true)}
+        onNotifications={() => setShowNotifications(true)}
+        canAdd={canEdit}
         profile={profile}
         accountStats={accountStats}
         currency={currency}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 lg:py-7">
+        <OfflineBanner />
+        <InviteBanner />
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}
@@ -433,6 +491,13 @@ function App() {
             {currentView === 'analytics' && <AnalyticsDashboard expenses={expenses} />}
 
             {currentView === 'dashboard' && (
+              <>
+              <DueSoon
+                currency={currency}
+                version={recurringVersion}
+                onManage={() => setShowRecurring(true)}
+                onLogged={() => refreshExpenses().catch(() => undefined)}
+              />
               <DashboardView
                 allExpenses={expenses}
                 expenses={dashboardExpenses}
@@ -442,7 +507,7 @@ function App() {
                 budgets={budgets}
                 categoryStats={categoryStats}
                 currency={currency}
-                onAddExpense={() => openAddExpenseForm()}
+                onAddExpense={canEdit ? () => openAddExpenseForm() : undefined}
                 onEditExpense={handleEditExpense}
                 onSelectCategory={setSelectedCategory}
                 onOpenPdf={() => setShowPDFGenerator(true)}
@@ -450,6 +515,7 @@ function App() {
                 onGoToExpenses={() => setCurrentView('expenses')}
                 onGoToBudgets={() => setCurrentView('budgets')}
               />
+              </>
             )}
 
             {currentView === 'expenses' && (
@@ -474,7 +540,7 @@ function App() {
                   <div className="card-surface p-12 text-center">
                     <h2 className="text-xl font-display font-semibold text-ink mb-2">No expenses yet</h2>
                     <p className="text-sm text-slate mb-6">Start by adding your first expense or importing data in bulk.</p>
-                    <div className="flex flex-col sm:flex-row justify-center gap-3">
+                    <div className={`${canEdit ? 'flex' : 'hidden'} flex-col sm:flex-row justify-center gap-3`}>
                       <button onClick={() => openAddExpenseForm()} className={btnPrimary}>
                         Add expense
                       </button>
@@ -526,6 +592,24 @@ function App() {
             onClose={() => setShowCategoryManager(false)}
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showHousehold && (
+          <HouseholdPanel settings={settings} onUpdateSettings={updateSettings} onClose={() => setShowHousehold(false)} />
+        )}
+        {showRecurring && (
+          <RecurringManager
+            currency={currency}
+            onLogged={() => refreshExpenses().catch(() => undefined)}
+            onClose={() => {
+              setShowRecurring(false);
+              setRecurringVersion((v) => v + 1);
+            }}
+          />
+        )}
+        {showSplits && <SplitsPanel currency={currency} onClose={() => setShowSplits(false)} />}
+        {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
       </AnimatePresence>
 
       {showPDFGenerator && (

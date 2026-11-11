@@ -1,41 +1,40 @@
-"""CRUD for one user's per-category budgets — keyed by `category` itself
-(there's only ever one active budget per category), so PUT is an upsert.
+"""A ledger's budgets — one per key (a category id, or "group:<id>" for a
+whole parent group), so PUT is an upsert.
 """
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
 import db
-from dependencies.auth import get_user_id
+import keys as K
+from dependencies.ledger import LedgerCtx, editor, reader
 from models import Budget
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
-SK_PREFIX = "BUDGET#"
 
-
-def _strip_keys(item: dict) -> dict:
-    return {k: v for k, v in item.items() if k not in ("PK", "SK")}
+def budget_item(ledger_id: str, budget: dict) -> dict:
+    return db.stamp(
+        {"PK": K.ledger_pk(ledger_id), "SK": f"{K.BUDGET}{budget['category']}", **budget},
+        K.T_BUDGET,
+    )
 
 
 @router.get("", response_model=List[Budget])
-def list_budgets(user_id: str = Depends(get_user_id)):
-    items = db.query_by_sk_prefix(db.user_pk(user_id), SK_PREFIX)
-    return [Budget(**_strip_keys(i)) for i in items]
+def list_budgets(ctx: LedgerCtx = Depends(reader)):
+    return [Budget(**db.public(i)) for i in db.query(ctx.pk, K.BUDGET)]
 
 
 @router.put("/{category}", response_model=Budget)
-def upsert_budget(category: str, payload: Budget, user_id: str = Depends(get_user_id)):
+def upsert_budget(category: str, payload: Budget, ctx: LedgerCtx = Depends(editor)):
     if payload.category != category:
         raise HTTPException(status_code=400, detail="Body category must match the URL category")
-    item = {"PK": db.user_pk(user_id), "SK": f"{SK_PREFIX}{category}", **payload.model_dump(mode="json")}
-    db.put_item(item)
+    db.put_item(budget_item(ctx.ledger_id, payload.model_dump(mode="json")))
     return payload
 
 
 @router.delete("/{category}", status_code=204)
-def delete_budget(category: str, user_id: str = Depends(get_user_id)):
-    existing = db.get_item(db.user_pk(user_id), f"{SK_PREFIX}{category}")
-    if not existing:
+def delete_budget(category: str, ctx: LedgerCtx = Depends(editor)):
+    if not db.get_item(ctx.pk, f"{K.BUDGET}{category}"):
         raise HTTPException(status_code=404, detail="Budget not found")
-    db.delete_item(db.user_pk(user_id), f"{SK_PREFIX}{category}")
+    db.delete_item(ctx.pk, f"{K.BUDGET}{category}")

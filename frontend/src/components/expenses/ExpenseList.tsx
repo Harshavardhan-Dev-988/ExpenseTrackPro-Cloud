@@ -5,6 +5,7 @@ import { getCategoryIcon } from '../../utils/helpers';
 import cloudApi from '../../services/cloudApi';
 import { formatMoney } from '../../utils/helpers';
 import { useToast } from '../ui/toastContext';
+import { useHousehold } from '../household/householdContext';
 
 interface ExpenseListProps {
   expenses: Expense[];
@@ -17,6 +18,7 @@ interface ExpenseListProps {
 
 export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recent Expenses', currency = 'INR' }: ExpenseListProps) {
   const toast = useToast();
+  const hh = useHousehold();
 
   const openReceipt = async (key: string) => {
     // Open the tab synchronously (inside the click) so popup blockers allow
@@ -93,6 +95,17 @@ export default function ExpenseList({ expenses, onEdit, onDelete, title = 'Recen
                       </button>
                     )}
                   </div>
+                  {((hh.isShared && expense.createdBy && expense.createdBy !== hh.me.userId) || expense.split || expense.recurringId) && (
+                    <div className="flex flex-wrap gap-1.5 mt-1 text-[11px] text-slate">
+                      {hh.isShared && expense.createdBy && expense.createdBy !== hh.me.userId && <span>by {hh.personName(expense.createdBy)}</span>}
+                      {expense.split && (
+                        <span className="px-1.5 rounded bg-pine/10 text-pine-strong dark:text-pine" title={expense.split.shares.map((s) => `${hh.personName(s.person)} ${formatMoney(s.amount, currency)}`).join(', ')}>
+                          split {expense.split.shares.length} ways{expense.paidBy ? ` · paid by ${hh.personName(expense.paidBy)}` : ''}
+                        </span>
+                      )}
+                      {expense.recurringId && <span className="px-1.5 rounded bg-brass/12 text-brass-strong dark:text-brass">recurring</span>}
+                    </div>
+                  )}
                   {expense.tags && expense.tags.length > 0 && (
                     <div className="flex gap-1 mt-1">
                       {expense.tags.map((tag, idx) => (

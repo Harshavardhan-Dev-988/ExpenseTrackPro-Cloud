@@ -46,6 +46,7 @@ api_stack = ApiStack(
     user_pool=auth_stack.user_pool,
     user_pool_client=auth_stack.user_pool_client,
     table=data_stack.table,
+    legacy_table=data_stack.legacy_table,
     receipts_bucket=data_stack.receipts_bucket,
     site=site,
     env=env,

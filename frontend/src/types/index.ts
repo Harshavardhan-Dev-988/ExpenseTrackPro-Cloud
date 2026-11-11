@@ -117,6 +117,15 @@ export interface Expense {
   paymentMethod?: PaymentMethod; // Payment type
   tags?: string[];               // Custom tags for filtering
   receiptUrl?: string;           // Optional receipt image (future)
+  /** Who paid: "m:<userId>" (a household member) or "n:<name>" (anyone else). */
+  paidBy?: string;
+  /** Present when the cost is shared; shares add up to amount. */
+  split?: Split;
+  /** Set when a recurring rule logged this expense. */
+  recurringId?: string;
+  /** Household member who recorded it (set by the server). */
+  createdBy?: string;
+  createdByName?: string;
   createdAt: Date;               // Record creation timestamp
   updatedAt: Date;               // Last update timestamp
 }
@@ -168,6 +177,8 @@ export interface Settings {
   dateFormat: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD';
   theme: 'light' | 'dark' | 'system';
   locale: string;
+  /** 'jan' = calendar year, 'apr' = Indian financial year (Apr–Mar). Household-wide. */
+  yearStart?: 'jan' | 'apr';
 }
 
 // Savings Types
@@ -300,3 +311,14 @@ export interface MultiSeriesChartData {
   name: string;
   [key: string]: string | number;
 }
+
+export interface SplitShare {
+  person: string;
+  amount: number;
+}
+
+export interface Split {
+  shares: SplitShare[];
+}
+
+export * from './household';

@@ -55,6 +55,10 @@ class AuthStack(cdk.Stack):
                 require_symbols=False,
             ),
             account_recovery=cognito.AccountRecovery.EMAIL_ONLY,
+            # A changed email only takes effect once the new address is
+            # verified. Household invites are matched on the token's email,
+            # so this stops anyone claiming an address they don't own.
+            keep_original=cognito.KeepOriginalAttrs(email=True),
             # Sign-up now happens in the app itself (components/auth/AuthCard),
             # which asks for the 6-digit code from this email - so it should
             # look like it came from us, not a bare "Your verification code".
@@ -103,6 +107,7 @@ class AuthStack(cdk.Stack):
             scopes=["email", "profile", "openid"],
             attribute_mapping=cognito.AttributeMapping(
                 email=cognito.ProviderAttribute.GOOGLE_EMAIL,
+                email_verified=cognito.ProviderAttribute.GOOGLE_EMAIL_VERIFIED,
                 fullname=cognito.ProviderAttribute.GOOGLE_NAME,
             ),
         )

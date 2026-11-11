@@ -1,10 +1,11 @@
 """Presigned S3 URLs for receipt photos — the image bytes never pass through
 this Lambda. The receipts bucket (see cdk/stacks/data_stack.py) blocks all
 public access, so every access — upload or view — goes through a
-short-lived, per-user-scoped presigned URL generated here.
+short-lived presigned URL generated here, scoped to the caller's ledger
+(household): every member can view a receipt, editors can add or remove one.
 
 The `Expense.receiptUrl` field, despite its name, holds the S3 *object key*
-for a cloud-backed expense (e.g. "receipts/<userId>/<uuid>.jpg"), not a
+for a cloud-backed expense (e.g. "receipts/<ledgerId>/<uuid>.jpg"), not a
 directly-resolvable URL — the bucket is private, so the frontend calls
 GET /receipts/view-url each time it actually wants to display the image,
 rather than storing one long-lived link.
@@ -22,7 +23,8 @@ import boto3
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from dependencies.auth import get_user_id
+from dependencies.ledger import LedgerCtx, editor, reader
+from services import ledgers as L
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 
@@ -67,12 +69,24 @@ def _bucket_name() -> str:
     return os.environ[BUCKET_NAME_ENV]
 
 
-def _user_prefix(user_id: str) -> str:
-    return f"receipts/{user_id}/"
+def _ledger_prefix(ledger_id: str) -> str:
+    return f"receipts/{ledger_id}/"
+
+
+def _allowed(key: str, ctx: LedgerCtx) -> bool:
+    """Receipts uploaded since schema v2 live under the ledger's prefix.
+    Older ones (per-user prefix) stay readable through the ledger they
+    were migrated into: its META item remembers that prefix."""
+    if ".." in key:
+        return False
+    if key.startswith(_ledger_prefix(ctx.ledger_id)):
+        return True
+    legacy = (L.get_meta(ctx.ledger_id) or {}).get("legacyReceiptPrefix")
+    return bool(legacy) and key.startswith(legacy)
 
 
 @router.post("/upload-url", response_model=UploadUrlResponse)
-def create_upload_url(payload: UploadUrlRequest, user_id: str = Depends(get_user_id)):
+def create_upload_url(payload: UploadUrlRequest, ctx: LedgerCtx = Depends(editor)):
     extension = ALLOWED_CONTENT_TYPES.get(payload.contentType)
     if not extension:
         raise HTTPException(
@@ -81,7 +95,7 @@ def create_upload_url(payload: UploadUrlRequest, user_id: str = Depends(get_user
             f"Allowed: {', '.join(ALLOWED_CONTENT_TYPES)}",
         )
 
-    key = f"{_user_prefix(user_id)}{uuid.uuid4()}.{extension}"
+    key = f"{_ledger_prefix(ctx.ledger_id)}{uuid.uuid4()}.{extension}"
     upload_url = _client().generate_presigned_url(
         "put_object",
         Params={"Bucket": _bucket_name(), "Key": key, "ContentType": payload.contentType},
@@ -91,12 +105,11 @@ def create_upload_url(payload: UploadUrlRequest, user_id: str = Depends(get_user
 
 
 @router.get("/view-url", response_model=ViewUrlResponse)
-def create_view_url(key: str, user_id: str = Depends(get_user_id)):
-    if not key.startswith(_user_prefix(user_id)):
-        # Either a stale/mistyped key, or someone probing for another
-        # user's receipts by guessing a key - either way, no presigned URL
-        # for anything outside the caller's own prefix.
-        raise HTTPException(status_code=403, detail="Not your receipt")
+def create_view_url(key: str, ctx: LedgerCtx = Depends(reader)):
+    if not _allowed(key, ctx):
+        # A stale/mistyped key, or someone probing for another household's
+        # receipts: no presigned URL outside the caller's ledger.
+        raise HTTPException(status_code=403, detail="Not this household's receipt")
 
     view_url = _client().generate_presigned_url(
         "get_object",
@@ -107,7 +120,7 @@ def create_view_url(key: str, user_id: str = Depends(get_user_id)):
 
 
 @router.delete("/{key:path}", status_code=204)
-def delete_receipt(key: str, user_id: str = Depends(get_user_id)):
-    if not key.startswith(_user_prefix(user_id)):
-        raise HTTPException(status_code=403, detail="Not your receipt")
+def delete_receipt(key: str, ctx: LedgerCtx = Depends(editor)):
+    if not _allowed(key, ctx):
+        raise HTTPException(status_code=403, detail="Not this household's receipt")
     _client().delete_object(Bucket=_bucket_name(), Key=key)

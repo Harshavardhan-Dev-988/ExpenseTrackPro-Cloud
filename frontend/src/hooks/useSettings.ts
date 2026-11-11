@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Settings } from '../types';
 import db from '../services/cloudApi';
+import { setYearStart } from '../utils/period';
 
 // The category taxonomy (UPI, agri_* categories, festival gifting, PPF/NPS
 // savings) and every hardcoded formatter elsewhere in this app assume an
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS: Settings = {
   dateFormat: 'DD/MM/YYYY',
   theme: 'system',
   locale: 'en-IN',
+  yearStart: 'jan',
 };
 
 function applyTheme(theme: 'light' | 'dark' | 'system') {
@@ -35,7 +37,9 @@ export const useSettings = () => {
       if (mode === 'initial') setLoading(true);
       setError(null);
       const savedSettings = await db.getSettings();
-      setSettings(savedSettings || DEFAULT_SETTINGS);
+      const loaded = { ...DEFAULT_SETTINGS, ...(savedSettings || {}) };
+      setYearStart(loaded.yearStart);
+      setSettings(loaded);
     } catch (err) {
       console.error('Error loading settings:', err);
       if (mode === 'refresh') throw err;
@@ -56,11 +60,13 @@ export const useSettings = () => {
   const updateSettings = useCallback(async (newSettings: Partial<Settings>) => {
     const previous = settings;
     const updatedSettings = { ...settings, ...newSettings };
+    setYearStart(updatedSettings.yearStart);
     setSettings(updatedSettings);
     if (newSettings.theme) applyTheme(newSettings.theme);
     try {
       await db.saveSettings(updatedSettings);
     } catch (err) {
+      setYearStart(previous.yearStart);
       setSettings(previous);
       applyTheme(previous.theme);
       throw err;

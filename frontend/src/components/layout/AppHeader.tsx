@@ -18,6 +18,8 @@ import type { ExportFormat } from '../../hooks/useExportActions';
 import { NAV_ITEMS, type View } from './nav';
 import AccountSummary, { Avatar, type AccountStats } from './AccountMenu';
 import type { UserProfile } from '../../hooks/useUserProfile';
+import { ROLE_LABEL, useHousehold } from '../household/householdContext';
+import { canInstall, onInstallChange, promptInstall } from '../../services/install';
 
 
 interface AppHeaderProps {
@@ -34,6 +36,12 @@ interface AppHeaderProps {
   onToggleTheme: () => void;
   onSignOut: () => void;
   onManageCategories: () => void;
+  onHousehold: () => void;
+  onRecurring: () => void;
+  onSplits: () => void;
+  onNotifications: () => void;
+  /** False for view-only members: no "Add expense". */
+  canAdd: boolean;
   profile: UserProfile | null;
   accountStats: AccountStats;
   currency: string;
@@ -72,6 +80,11 @@ const ICONS = {
   budgets: icon(['M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z', 'M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z']),
   savings: icon('M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'),
   analytics: icon('M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z'),
+  people: icon('M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'),
+  repeat: icon('M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'),
+  split: icon('M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'),
+  bell: icon('M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'),
+  swap: icon('M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4'),
 };
 
 const VIEW_ICONS: Record<View, ReactNode> = {
@@ -85,7 +98,7 @@ const VIEW_ICONS: Record<View, ReactNode> = {
 // ---------------------------------------------------------------------------
 // Shared menu content (used by both the desktop dropdown and mobile drawer)
 // ---------------------------------------------------------------------------
-interface MenuContentProps extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense'> {
+interface MenuContentProps extends Omit<AppHeaderProps, 'currentView' | 'onNavigate' | 'onAddExpense' | 'canAdd'> {
   close: () => void;
   /** Phone drawer: the section links, between the account block and the actions. */
   sections?: ReactNode;
@@ -152,8 +165,16 @@ function MenuContent({
   accountStats,
   currency,
   sections,
+  onHousehold,
+  onRecurring,
+  onSplits,
+  onNotifications,
 }: MenuContentProps) {
   const [exportOpen, setExportOpen] = useState(false);
+  const hh = useHousehold();
+  const otherLedgers = hh.ledgers.filter((l) => l.id !== hh.ledger.id);
+  const [installable, setInstallable] = useState(canInstall());
+  useEffect(() => onInstallChange(() => setInstallable(canInstall())), []);
   const run = (fn: () => void) => () => {
     close();
     fn();
@@ -165,6 +186,25 @@ function MenuContent({
         <AccountSummary profile={profile} stats={accountStats} currency={currency} onWhatsApp={run(onWhatsApp)} />
       </div>
       {sections}
+      <MenuSectionLabel>Household</MenuSectionLabel>
+      <MenuItem
+        iconNode={ICONS.people}
+        hint={`${hh.members.length} ${hh.members.length === 1 ? 'member' : 'members'} · ${ROLE_LABEL[hh.role].toLowerCase()}`}
+        onSelect={run(onHousehold)}
+      >
+        {hh.ledger.name}
+      </MenuItem>
+      {otherLedgers.slice(0, 3).map((l) => (
+        <MenuItem key={l.id} iconNode={ICONS.swap} hint="Switch household" onSelect={run(() => hh.switchLedger(l.id))}>
+          {l.name}
+        </MenuItem>
+      ))}
+      <MenuItem iconNode={ICONS.repeat} hint="Rent, salaries, EMIs, fees" onSelect={run(onRecurring)}>
+        Recurring expenses
+      </MenuItem>
+      <MenuItem iconNode={ICONS.split} hint="Shared costs and who owes whom" onSelect={run(onSplits)}>
+        Split &amp; settle up
+      </MenuItem>
       <MenuSectionLabel>Your data</MenuSectionLabel>
       <MenuItem iconNode={ICONS.import} hint="CSV, Excel or JSON file" onSelect={run(onImport)}>
         Import expenses
@@ -222,6 +262,14 @@ function MenuContent({
       </MenuItem>
 
       <MenuSectionLabel>Preferences</MenuSectionLabel>
+      <MenuItem iconNode={ICONS.bell} hint="Budget alerts, monthly summary" onSelect={run(onNotifications)}>
+        Notifications
+      </MenuItem>
+      {installable && (
+        <MenuItem iconNode={ICONS.import} hint="Open it from your home screen, even offline" onSelect={run(() => void promptInstall())}>
+          Install app
+        </MenuItem>
+      )}
       <MenuItem
         iconNode={isDarkMode ? ICONS.sun : ICONS.moon}
         onSelect={onToggleTheme}
@@ -346,6 +394,7 @@ export default function AppHeader(props: AppHeaderProps) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {props.canAdd && (
             <button
               type="button"
               onClick={onAddExpense}
@@ -355,6 +404,7 @@ export default function AppHeader(props: AppHeaderProps) {
               {ICONS.plus}
               <span className="hidden sm:inline">Add expense</span>
             </button>
+            )}
 
             {/* One control for the menu and the account: ☰ + avatar. */}
             <div className="relative">
