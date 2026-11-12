@@ -1,4 +1,10 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
 <title>ExpenseTrack Pro Architecture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -176,6 +182,7 @@ td.mono{font-family:var(--mono);font-size:12.5px}
 .m-POST{background:var(--brass-soft);color:var(--brass)}
 .m-PUT{background:var(--slate-soft);color:var(--slate)}
 .m-DELETE{background:var(--ember-soft);color:var(--ember)}
+.m-PATCH{background:var(--slate-soft);color:var(--slate)}
 .open{font-family:var(--mono);font-size:10px;color:var(--ember);border:1px solid var(--ember);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
 
 /* Stack graph & cards */
@@ -358,7 +365,7 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
     <div>
       <div class="eyebrow"><span>ExpenseTrack Pro</span><span class="dot"></span><span>Engineering atlas</span></div>
       <h1>How the ledger is built, <em>end to end</em></h1>
-      <p class="lede">A household expense tracker for Indian families. A React app on S3 and CloudFront calls a FastAPI app on Lambda through API Gateway. Cognito handles sign-in and DynamoDB stores the data. The infrastructure is AWS CDK in Python. This page is the visual companion to the repository README.</p>
+      <p class="lede">A household expense tracker for Indian families, shared by the whole household. A React app on S3 and CloudFront calls a FastAPI app on Lambda through API Gateway. Cognito handles sign-in, DynamoDB stores each household's ledger, and a scheduled Lambda logs recurring bills and builds budget emails. The infrastructure is AWS CDK in Python. This page is the visual companion to the repository README.</p>
       <div class="endpoints">
         <div class="ep"><b>App</b><a href="https://d3bttra9tv41h7.cloudfront.net" target="_blank" rel="noopener">d3bttra9tv41h7.cloudfront.net</a></div>
         <div class="ep"><b>API</b><a href="https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com/health" target="_blank" rel="noopener">hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com</a></div>
@@ -371,12 +378,13 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <ol>
         <li><span class="ln">01</span><span class="lbl">AWS Region<small>everything regional lives in ap-southeast-2</small></span><span class="fig">1</span></li>
         <li><span class="ln">02</span><span class="lbl">CDK stacks per stage<small>Auth · Data · Api · Monitoring · Frontend</small></span><span class="fig">5</span></li>
-        <li><span class="ln">03</span><span class="lbl">Lambda functions<small>the whole FastAPI app, behind Mangum</small></span><span class="fig">1</span></li>
-        <li><span class="ln">04</span><span class="lbl">DynamoDB tables / GSIs<small>single table, one partition per user</small></span><span class="fig">1 / 0</span></li>
-        <li><span class="ln">05</span><span class="lbl">Gateway routes / API endpoints<small>/{proxy+} with JWT, /health and /whatsapp/webhook public</small></span><span class="fig">3 / 25</span></li>
-        <li><span class="ln">06</span><span class="lbl">Expense categories<small>in 13 groups, tuned for Indian households</small></span><span class="fig brass">81</span></li>
-        <li><span class="ln">07</span><span class="lbl">Secrets / CloudWatch alarms<small>secrets resolved at deploy time; alarms go to email</small></span><span class="fig">3 / 5</span></li>
-        <li><span class="ln">08</span><span class="lbl">Presigned URL lifetime<small>receipts never pass through Lambda</small></span><span class="fig brass">300 s</span></li>
+        <li><span class="ln">03</span><span class="lbl">Lambda functions<small>API · scheduled jobs · data migrations</small></span><span class="fig">3</span></li>
+        <li><span class="ln">04</span><span class="lbl">DynamoDB tables / GSIs<small>single table v2, one partition per household</small></span><span class="fig">1 / 2</span></li>
+        <li><span class="ln">05</span><span class="lbl">Gateway routes / API endpoints<small>/{proxy+} with JWT, /health and /whatsapp/webhook public</small></span><span class="fig">3 / 58</span></li>
+        <li><span class="ln">06</span><span class="lbl">Expense categories<small>in 13 groups, plus each household's own</small></span><span class="fig brass">81</span></li>
+        <li><span class="ln">07</span><span class="lbl">Roles per household<small>owner · editor · viewer, checked on every request</small></span><span class="fig">3</span></li>
+        <li><span class="ln">08</span><span class="lbl">Secrets / CloudWatch alarms<small>secrets resolved at deploy time; alarms go to email</small></span><span class="fig">3 / 5</span></li>
+        <li><span class="ln">09</span><span class="lbl">Presigned URL lifetime<small>receipts never pass through Lambda</small></span><span class="fig brass">300 s</span></li>
       </ol>
     </div>
   </div>
@@ -411,7 +419,7 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <div class="sec-h"><span class="sec-n">§1</span><h2>System design</h2>
         <p>High-level design of the dev stage. Select any box to see what it does, where it is defined, and which lines touch it.</p></div>
       <div class="fig-frame hld-wrap">
-        <div class="fig-scroll"><svg id="hld-svg" viewBox="0 0 1180 650" role="img" aria-label="Architecture diagram: browser, CloudFront, Cognito, API Gateway, Lambda, DynamoDB, S3, Secrets Manager, CloudWatch, Twilio, Google and Facebook"></svg></div>
+        <div class="fig-scroll"><svg id="hld-svg" viewBox="0 0 1180 724" role="img" aria-label="Architecture diagram: browser, CloudFront, Cognito, API Gateway, API Lambda, jobs Lambda, EventBridge, migrate Lambda, DynamoDB, S3, SES, Secrets Manager, CloudWatch, Twilio, Google and Facebook"></svg></div>
         <div class="detail" id="hld-detail" aria-live="polite"></div>
         <div class="fig-cap">
           <div class="legend">
@@ -428,25 +436,25 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
 
       <h3>Design decisions</h3>
       <div class="grid3">
-        <div class="card"><span class="why">Compute</span><h4>One Lambda for the whole API</h4><p>Routing happens inside FastAPI. One function keeps deploys simple and means only one cold start.</p></div>
-        <div class="card"><span class="why">Auth</span><h4>Tokens are checked at the gateway</h4><p>The JWT authorizer rejects bad tokens before Lambda runs. Route code only asks who the caller is.</p></div>
-        <div class="card"><span class="why">Storage</span><h4>Single-table DynamoDB</h4><p>Every read is one partition, <code>PK = USER#&lt;sub&gt;</code>, so no secondary indexes are needed.</p></div>
-        <div class="card"><span class="why">Files</span><h4>Receipts skip Lambda</h4><p>The browser uploads and downloads directly from S3 with 5-minute presigned URLs scoped to the caller.</p></div>
+        <div class="card"><span class="why">Compute</span><h4>One Lambda for the whole API</h4><p>Routing happens inside FastAPI. Two more functions do background work: scheduled jobs, and migrations after each deploy.</p></div>
+        <div class="card"><span class="why">Auth</span><h4>Tokens at the gateway, roles in the app</h4><p>The JWT authorizer rejects bad tokens before Lambda runs. Each route then checks the caller is a member of the household with the role it needs.</p></div>
+        <div class="card"><span class="why">Storage</span><h4>One table, keyed by household</h4><p>Each household is one partition, <code>LEDGER#&lt;id&gt;</code>. Two sparse indexes cover memberships, invites, due bills and date ranges. No scans on requests.</p></div>
+        <div class="card"><span class="why">Files</span><h4>Receipts skip Lambda</h4><p>The browser uploads and downloads directly from S3 with 5-minute presigned URLs scoped to the household.</p></div>
         <div class="card"><span class="why">Secrets</span><h4>Not in git, not in templates</h4><p>CDK emits <code>{{resolve:secretsmanager:…}}</code> references. CloudFormation fills them in at deploy time.</p></div>
-        <div class="card"><span class="why">Public routes</span><h4>Two literal routes skip auth</h4><p><code>/health</code> and <code>/whatsapp/webhook</code> take precedence over the authorized <code>/{proxy+}</code> catch-all.</p></div>
+        <div class="card"><span class="why">Schema</span><h4>Data changes ship as code</h4><p>Numbered migrations run once per table after each deploy. They only write what's missing, so a re-run never overwrites users' changes.</p></div>
       </div>
     </section>
 
     <!-- §2 lifecycle -->
     <section class="sec" id="lifecycle">
       <div class="sec-h"><span class="sec-n">§2</span><h2>Life of a request</h2>
-        <p>What happens between a click and a DynamoDB read. Step 3 is the security gate: the Lambda never sees a request that failed it.</p></div>
+        <p>What happens between a click and a DynamoDB read. Steps 3 and 5 are the security gates: the gateway checks the token, the app checks the household membership.</p></div>
       <div class="steps">
         <div class="step"><span class="no">1</span><h4>Get a token</h4><p>Amplify returns the Cognito ID token, refreshing it if needed.</p><span class="where">fetchAuthSession()</span></div>
-        <div class="step"><span class="no">2</span><h4>Call the API</h4><p>The only HTTP client sends <code>Authorization: Bearer</code>.</p><span class="where">services/cloudApi.ts</span></div>
+        <div class="step"><span class="no">2</span><h4>Call the API</h4><p>Sends <code>Authorization: Bearer</code> and <code>X-Ledger-Id</code>.</p><span class="where">services/cloudApi.ts</span></div>
         <div class="step gate"><span class="no">3</span><h4>Gateway verifies</h4><p>Signature, issuer = user pool, audience = app client. Fail → 401.</p><span class="where">HTTP API JWT authorizer</span></div>
-        <div class="step"><span class="no">4</span><h4>Who is it?</h4><p>Mangum hands off to FastAPI; the verified <code>sub</code> claim is the user id.</p><span class="where">dependencies/auth.py</span></div>
-        <div class="step"><span class="no">5</span><h4>Read the partition</h4><p>Query <code>USER#&lt;sub&gt;</code>, return camelCase JSON.</p><span class="where">routers/* → db.py</span></div>
+        <div class="step"><span class="no">4</span><h4>Who is it?</h4><p>Mangum hands off to FastAPI; the verified <code>sub</code>, email and email-verified claims identify the caller.</p><span class="where">dependencies/auth.py</span></div>
+        <div class="step gate"><span class="no">5</span><h4>Member? Then read</h4><p>One <code>GetItem</code> on <code>MEMBER#&lt;sub&gt;</code> checks the role, then the router queries <code>LEDGER#&lt;id&gt;</code>.</p><span class="where">dependencies/ledger.py → db.py</span></div>
       </div>
       <p class="callout" style="margin-top:14px"><b>Why the ID token and not the access token?</b> The HTTP API authorizer checks <code>aud</code> against the app client id, and only Cognito's ID token carries <code>aud</code>.</p>
     </section>
@@ -462,10 +470,10 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <ul><li>User pool <code>expense-track-pro-&lt;stage&gt;</code></li><li>Hosted domain for OAuth</li><li>Google and Facebook IdPs</li><li>Public SPA client (no secret)</li><li>Branded verification email</li></ul>
           <div class="out"><span class="chip pine">UserPoolId</span><span class="chip pine">UserPoolClientId</span><span class="chip pine">HostedUiDomainUrl</span></div></div>
         <div class="card"><h4>ExpenseTrack-Data-&lt;stage&gt;</h4>
-          <ul><li>DynamoDB table: PK/SK, on-demand, TTL <code>ttl</code></li><li>Point-in-time recovery in prod only</li><li>Receipts bucket: private, SSE-S3, CORS for app origins</li></ul>
-          <div class="out"><span class="chip pine">TableName</span><span class="chip pine">ReceiptsBucketName</span></div></div>
+          <ul><li>Table <code>expense-track-pro-v2-&lt;stage&gt;</code>: PK/SK + GSI1 + GSI2, on-demand, TTL <code>ttl</code></li><li>Point-in-time recovery on; deletion protection in prod</li><li>Schema-v1 table kept and retained (read-only)</li><li>Receipts bucket: private, SSE-S3, CORS for app origins</li></ul>
+          <div class="out"><span class="chip pine">TableName</span><span class="chip pine">LegacyTableName</span><span class="chip pine">ReceiptsBucketName</span></div></div>
         <div class="card"><h4>ExpenseTrack-Api-&lt;stage&gt;</h4>
-          <ul><li>Lambda: Python 3.12, 256 MB, 15 s</li><li>Read/write grants on table and bucket</li><li>HTTP API with Cognito authorizer, CORS and 3 routes</li><li>Docker-free bundling via <code>local_bundling.py</code></li></ul>
+          <ul><li>API Lambda: Python 3.12, 256 MB, 15 s</li><li>Jobs Lambda (5 min) on 3 EventBridge schedules, with <code>ses:SendEmail</code></li><li>Migrate Lambda run by a CDK Trigger after the API updates</li><li>HTTP API with Cognito authorizer, CORS and 3 routes</li><li>Docker-free bundling via <code>local_bundling.py</code></li></ul>
           <div class="out"><span class="chip pine">ApiUrl</span></div></div>
         <div class="card"><h4>ExpenseTrack-Monitoring-&lt;stage&gt;</h4>
           <ul><li>SNS topic <code>expense-track-pro-alerts-&lt;stage&gt;</code></li><li>Email subscription</li><li>5 CloudWatch alarms (see §14)</li></ul></div>
@@ -473,7 +481,7 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <ul><li>Private site bucket</li><li>CloudFront with OAC and HTTPS redirect</li><li>SPA fallback: 403/404 → <code>/index.html</code></li><li>Deploys <code>frontend/dist-aws</code> and invalidates <code>/*</code></li></ul>
           <div class="out"><span class="chip pine">SiteUrl</span><span class="chip pine">SiteBucketName</span></div></div>
         <div class="card" style="background:var(--sunk)"><h4 style="color:var(--ember)">Removal policy</h4>
-          <p>Outside prod, the table, buckets and user pool are <b>DESTROY</b> and buckets auto-empty, so <code>cdk destroy</code> removes everything. In prod they are <b>RETAIN</b>.</p></div>
+          <p>Outside prod, the v2 table, buckets and user pool are <b>DESTROY</b> and buckets auto-empty, so <code>cdk destroy</code> removes everything. In prod they are <b>RETAIN</b>. The schema-v1 table is <b>RETAIN</b> everywhere until it is removed on purpose.</p></div>
       </div>
 
       <h3>HTTP API routes</h3>
@@ -490,7 +498,10 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <div class="tbl-wrap"><table>
         <thead><tr><th>Variable</th><th>Source</th><th>Used by</th></tr></thead>
         <tbody>
-          <tr><td class="mono">TABLE_NAME</td><td>Data stack</td><td class="mono">db.py</td></tr>
+          <tr><td class="mono">TABLE_NAME</td><td>Data stack (v2 table)</td><td class="mono">db.py · all three functions</td></tr>
+          <tr><td class="mono">LEGACY_TABLE_NAME</td><td>Data stack (v1 table)</td><td>migrate Lambda only</td></tr>
+          <tr><td class="mono">APP_URL · APP_ORIGINS</td><td>CloudFront URL and allowed origins</td><td>links in emails · CORS</td></tr>
+          <tr><td class="mono">EMAIL_ENABLED · EMAIL_FROM</td><td>CDK context <code>emailEnabled</code>, <code>emailFrom</code></td><td class="mono">services/notify.py</td></tr>
           <tr><td class="mono">RECEIPTS_BUCKET_NAME</td><td>Data stack</td><td class="mono">routers/receipts.py</td></tr>
           <tr><td class="mono">STAGE</td><td><code>stage</code> context</td><td class="mono">dependencies/auth.py</td></tr>
           <tr><td class="mono">TWILIO_AUTH_TOKEN</td><td>Secrets Manager, dynamic reference</td><td>webhook signature check</td></tr>
@@ -509,7 +520,9 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
         <div class="down">Mangum translates the event to ASGI</div>
         <div class="layer"><div class="lname">Entry</div><div class="lbody">
           <div class="mod pine"><b>lambda_handler.py</b><small>handler = Mangum(app)</small></div>
-          <div class="mod pine"><b>main.py</b><small>FastAPI app · CORSMiddleware · registers 7 routers</small></div></div></div>
+          <div class="mod pine"><b>main.py</b><small>FastAPI app · CORSMiddleware · registers 12 routers</small></div>
+          <div class="mod"><b>jobs_handler.py</b><small>EventBridge → recurring, budget_alerts, monthly_summary</small></div>
+          <div class="mod"><b>migrate_handler.py</b><small>CDK Trigger → migrations.run_pending()</small></div></div></div>
         <div class="down">route match</div>
         <div class="layer"><div class="lname">Routers</div><div class="lbody">
           <div class="mod"><b>health</b><small>/health</small></div>
@@ -518,19 +531,29 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <div class="mod"><b>budgets</b><small>/budgets/{category}</small></div>
           <div class="mod"><b>savings</b><small>/savings/entries, /goals</small></div>
           <div class="mod"><b>receipts</b><small>upload-url, view-url</small></div>
-          <div class="mod"><b>whatsapp</b><small>link-code, status, webhook</small></div></div></div>
-        <div class="down">Depends(get_user_id) · Pydantic validation</div>
+          <div class="mod"><b>whatsapp</b><small>link-code, status, webhook</small></div>
+          <div class="mod"><b>categories</b><small>/categories/groups, /items</small></div>
+          <div class="mod pine"><b>ledgers</b><small>/me, /ledgers, members, invites</small></div>
+          <div class="mod pine"><b>recurring</b><small>/recurring, /run, /log, /skip</small></div>
+          <div class="mod pine"><b>splits</b><small>/splits/balances, /settlements</small></div>
+          <div class="mod pine"><b>notifications</b><small>/notifications/outbox, /preview/*</small></div></div></div>
+        <div class="down">Depends(reader | editor | owner) · Pydantic validation</div>
         <div class="layer"><div class="lname">Shared</div><div class="lbody">
-          <div class="mod brass"><b>dependencies/auth.py</b><small>get_user_id() returns the Cognito sub</small></div>
+          <div class="mod brass"><b>dependencies/auth.py</b><small>get_identity(): sub, email, email verified</small></div>
+          <div class="mod brass"><b>dependencies/ledger.py</b><small>X-Ledger-Id → member check → LedgerCtx(role)</small></div>
+          <div class="mod brass"><b>keys.py</b><small>every key builder; nothing else writes a raw key</small></div>
           <div class="mod brass"><b>models.py</b><small>camelCase Pydantic models, mirror types/index.ts</small></div>
-          <div class="mod brass"><b>db.py</b><small>get / put / delete / query by SK prefix, float → Decimal</small></div></div></div>
+          <div class="mod brass"><b>db.py</b><small>conditional put, update_fields, GSI query, batch, transact</small></div>
+          <div class="mod"><b>services/</b><small>ledgers · recurring · notify</small></div>
+          <div class="mod"><b>migrations/</b><small>m001_user_to_ledger …</small></div></div></div>
         <div class="down">boto3 (clients created lazily, so tests can mock them)</div>
         <div class="layer"><div class="lname">AWS</div><div class="lbody">
           <div class="mod"><b>DynamoDB</b><small>Table resource API</small></div>
-          <div class="mod"><b>S3</b><small>generate_presigned_url (PUT / GET, 300 s)</small></div></div></div>
+          <div class="mod"><b>S3</b><small>generate_presigned_url (PUT / GET, 300 s)</small></div>
+          <div class="mod"><b>SES v2</b><small>send_email, when enabled</small></div></div></div>
       </div>
       <h3>Docker-free bundling <span class="tag">stacks/local_bundling.py</span></h3>
-      <div class="prose"><p>The Lambda package is built without Docker: <code>pip install --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12</code> into the asset folder, then the API source is copied in. Every dependency in <code>api/requirements.txt</code> must therefore ship a manylinux wheel. Pure-Python packages are fine.</p></div>
+      <div class="prose"><p>The Lambda package is built without Docker: <code>pip install --platform manylinux2014_x86_64 --only-binary=:all: --python-version 3.12</code> into the asset folder, then the API source is copied in, minus <code>tests/</code>, <code>pytest.ini</code> and <code>requirements-dev.txt</code>. All three functions share this one asset. Every dependency in <code>api/requirements.txt</code> must ship a manylinux wheel. Pure-Python packages are fine.</p></div>
     </section>
 
     <!-- §5 frontend -->
@@ -547,8 +570,9 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
                 <div class="tnode"><div class="tn"><b>ConfirmProvider</b><span>promise-based confirm dialogs</span></div>
                   <div class="tnode"><div class="tn"><b>AuthGate</b><span>no user → SignInScreen</span></div>
                     <div class="tnode"><div class="tn"><b>MigrationGate</b><span>one-time IndexedDB → cloud</span></div>
-                      <div class="tnode" style="border-color:var(--pine-mid)"><div class="tn"><b>App</b><span>header, sections, modals, mutations</span></div></div>
-                    </div></div></div></div></div>
+                      <div class="tnode"><div class="tn"><b>HouseholdProvider</b><span>/me, picks the household, remounts App on switch</span></div>
+                        <div class="tnode" style="border-color:var(--pine-mid)"><div class="tn"><b>App</b><span>header, sections, modals, mutations</span></div></div>
+                      </div></div></div></div></div></div>
           </div>
         </div>
         <div>
@@ -556,12 +580,14 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <div class="cake">
             <div class="layer"><div class="lname">View</div><div class="lbody"><div class="mod"><b>DashboardView, ExpenseList…</b><small>render; call App handlers</small></div></div></div>
             <div class="layer"><div class="lname">Hooks</div><div class="lbody">
-              <div class="mod pine"><b>useExpenses</b><small>load once; local updates with server id</small></div>
+              <div class="mod pine"><b>useExpenses</b><small>load once; local updates; reloads after offline sync</small></div>
+              <div class="mod pine"><b>useHousehold</b><small>household, role, canEdit, members</small></div>
               <div class="mod pine"><b>useSettings</b><small>optimistic, rolls back</small></div>
               <div class="mod"><b>useAuth</b><small>Hub events</small></div>
               <div class="mod"><b>useAnalytics · useExportActions</b></div></div></div>
             <div class="layer"><div class="lname">Services</div><div class="lbody">
-              <div class="mod brass"><b>cloudApi.ts</b><small>Bearer token, ISO ↔ Date, explicit nulls, 5-way fan-out</small></div>
+              <div class="mod brass"><b>cloudApi.ts</b><small>Bearer token, X-Ledger-Id, ISO ↔ Date, batch create/delete</small></div>
+              <div class="mod brass"><b>offline.ts</b><small>IndexedDB read cache + add queue, synced on reconnect</small></div>
               <div class="mod"><b>backup · export · pdfGenerator · dashboardSnapshot</b></div></div></div>
           </div>
         </div>
@@ -569,8 +595,8 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <h3>App shell</h3>
       <div class="grid3">
         <div class="card"><h4>Sections</h4><p><code>dashboard</code>, <code>expenses</code>, <code>budgets</code>, <code>savings</code>, <code>analytics</code>. CloudFront's 403/404 fallback keeps future deep links safe.</p></div>
-        <div class="card"><h4>Header and ☰ menu</h4><p>Tabs and <b>Add expense</b> up top. Import, backup, export, WhatsApp, dark mode and sign-out live in the menu, which becomes a drawer on phones.</p></div>
-        <div class="card"><h4>Feedback</h4><p>Adds and edits toast. Deletes go through a confirm dialog. Bulk import and restore show progress toasts.</p></div>
+        <div class="card"><h4>Header and ☰ menu</h4><p>Tabs and <b>Add expense</b> up top. The menu holds the household switcher, members, recurring bills, splits, notifications, install app, import, backup, export, WhatsApp, dark mode and sign-out; it becomes a drawer on phones.</p></div>
+        <div class="card"><h4>Roles in the UI</h4><p>Viewers get a view-only banner and no add, edit or delete controls. Pending invites show as a banner with Accept and Decline. Bills due soon appear on the dashboard.</p></div>
       </div>
       <h3>Period logic <span class="tag">utils/period.ts</span></h3>
       <div class="tbl-wrap"><table>
@@ -579,6 +605,7 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <tr><td class="mono">resolvePeriod</td><td>Turns <code>today | month | year | all | custom</code> into dates and labels</td><td>“October 2026”</td></tr>
           <tr><td class="mono">previousPeriod</td><td>Comparison window, like for like on a running period</td><td>Oct 1–9 vs Sep 1–9</td></tr>
           <tr><td class="mono">bucketSeries</td><td>Groups the trend by day, week or month (see §7)</td><td>90 days → weeks</td></tr>
+          <tr><td class="mono">setYearStart · yearOf · yearLabel</td><td>The household’s year: calendar (Jan) or financial (Apr–Mar). Drives “Year” on the dashboard and yearly budgets</td><td>“FY 2026–27”</td></tr>
           <tr><td class="mono">budgetWindow + computeBudgetStatus</td><td>Scales budgets to the period; “today” is judged against the month</td><td>₹13,000/month over a quarter = ₹39,000</td></tr>
         </tbody></table></div>
       <h3>Design system <span class="tag">src/index.css</span></h3>
@@ -602,7 +629,8 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <div class="sec-h"><span class="sec-n">§7</span><h2>Branching logic</h2>
         <p>Decision paths read straight from the code. Each question either exits to the right or continues down.</p></div>
       <div class="ladders">
-        <div class="fig-frame ladder"><div class="fig-cap"><b>Who is calling?</b><code>dependencies/auth.py · get_user_id</code></div><div class="fig-scroll" id="lad-auth"></div></div>
+        <div class="fig-frame ladder"><div class="fig-cap"><b>Who is calling?</b><code>dependencies/auth.py · get_identity</code></div><div class="fig-scroll" id="lad-auth"></div></div>
+        <div class="fig-frame ladder"><div class="fig-cap"><b>May they do this here?</b><code>dependencies/ledger.py · reader / editor / owner</code></div><div class="fig-scroll" id="lad-ledger"></div></div>
         <div class="fig-frame ladder"><div class="fig-cap"><b>Trend granularity</b><code>utils/period.ts · bucketSeries</code></div><div class="fig-scroll" id="lad-bucket"></div></div>
       </div>
       <div class="fig-frame ladder" style="margin-top:14px"><div class="fig-cap"><b>WhatsApp webhook</b><code>routers/whatsapp.py · webhook</code></div><div class="fig-scroll" id="lad-wa"></div></div>
@@ -615,28 +643,38 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
     <!-- §8 data -->
     <section class="sec" id="data">
       <div class="sec-h"><span class="sec-n">§8</span><h2>Data model</h2>
-        <p>One DynamoDB table, keys <code>PK</code> and <code>SK</code>, on-demand billing, no secondary indexes. Rows below are shown in DynamoDB's own sort order; values are illustrative.</p></div>
+        <p>Schema v2: one DynamoDB table, <code>expense-track-pro-v2-&lt;stage&gt;</code>, on-demand, with two sparse, overloaded indexes. Data belongs to a <b>household</b> (a <i>ledger</i> in the code), so sharing adds a member and moves nothing. Rows below are in DynamoDB's sort order; values are illustrative. Full reference: <code>docs/data-model.md</code>.</p></div>
       <div class="parts">
         <div class="part">
-          <div class="part-h"><b>PK = USER#&lt;sub&gt;</b><span>one partition holds everything a user owns</span></div>
+          <div class="part-h"><b>PK = LEDGER#&lt;householdId&gt;</b><span>one partition per household</span></div>
           <div class="sk-sep">SK sorts lexicographically</div>
-          <div class="sk"><div class="skk"><i class="e-bud"></i>BUDGET#grocery</div><div class="ska"><b>category</b>, monthlyLimit 13000, yearlyLimit?, budgetType "monthly", alertThreshold 80, isActive</div></div>
-          <div class="sk"><div class="skk"><i class="e-bud"></i>BUDGET#fuel</div><div class="ska">one item per category, upserted by <b>PUT /budgets/{category}</b></div></div>
-          <div class="sk"><div class="skk"><i class="e-exp"></i>EXPENSE#0b7c…e21</div><div class="ska"><b>id</b>, date, amount 450, category "dine_out", description, paymentMethod "upi", tags?, receiptUrl?, createdAt, updatedAt</div></div>
-          <div class="sk"><div class="skk"><i class="e-exp"></i>EXPENSE#9f31…a04</div><div class="ska">receiptUrl holds the S3 <b>key</b>, not a URL</div></div>
-          <div class="sk"><div class="skk"><i class="e-sav"></i>SAVINGS_ENTRY#4c2d…</div><div class="ska"><b>id</b>, date, amount, category, description, account?, interestRate?, maturityDate?, isRecurring?, tags?</div></div>
-          <div class="sk"><div class="skk"><i class="e-sav"></i>SAVINGS_GOAL#77ab…</div><div class="ska"><b>id</b>, name, targetAmount, currentAmount, deadline?, category, priority, isActive, createdAt</div></div>
-          <div class="sk"><div class="skk"><i class="e-set"></i>SETTINGS</div><div class="ska">currency "INR", dateFormat "DD/MM/YYYY", theme "system", locale "en-IN"</div></div>
-          <div class="sk"><div class="skk"><i class="e-wa"></i>WHATSAPP_LINK</div><div class="ska">phoneNumber "+91…" (user → phone direction)</div></div>
+          <div class="sk"><div class="skk"><i class="e-bud"></i>BUDGET#grocery</div><div class="ska"><b>category</b>, monthlyLimit 13000, budgetType "monthly", alertThreshold 80 · also <b>BUDGET#group:&lt;id&gt;</b></div></div>
+          <div class="sk"><div class="skk"><i class="e-set"></i>CATEGORY# · CATGROUP#</div><div class="ska">the household's own categories and groups</div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>EXP#0b7c…e21</div><div class="ska"><b>id</b>, date, amount 2400, category, paidBy "m:&lt;sub&gt;", split?, recurringId?, createdBy · <b>GSI2</b> LEDGER#lid#EXP / date#id · <b>GSI1</b> LEDGER#lid#SPLIT only if split</div></div>
+          <div class="sk"><div class="skk"><i class="e-sav"></i>GOAL#77ab…</div><div class="ska"><b>id</b>, name, targetAmount, currentAmount, deadline?, priority</div></div>
+          <div class="sk"><div class="skk"><i class="e-wa"></i>INVITE#mom@example.com</div><div class="ska">role "viewer", invitedBy · <b>GSI1</b> INVITE#email <span class="ttl">expires 14 days</span></div></div>
+          <div class="sk"><div class="skk"><i class="e-set"></i>MEMBER#&lt;sub&gt;</div><div class="ska"><b>role</b> owner | editor | viewer, email, name · <b>GSI1</b> USER#sub / LEDGER#lid</div></div>
+          <div class="sk"><div class="skk"><i class="e-set"></i>META</div><div class="ska">name "Sharma household", ownerId, isPersonal · <b>GSI1</b> LEDGERS / lid</div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>OUTBOX#&lt;ts&gt;#&lt;id&gt;</div><div class="ska">email built while sending is off <span class="ttl">30 days</span></div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>RECUR#a1f2…</div><div class="ska">frequency, dayOfMonth, nextDue, autoLog · <b>GSI1</b> DUE#&lt;yyyy-mm&gt; / nextDue#lid#id while active</div></div>
+          <div class="sk"><div class="skk"><i class="e-sav"></i>SAVE#4c2d…</div><div class="ska">savings entry · <b>GSI2</b> LEDGER#lid#SAVE / date#id</div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>SENT#budget-…</div><div class="ska">"already emailed" marker <span class="ttl">400 days</span></div></div>
+          <div class="sk"><div class="skk"><i class="e-set"></i>SETTINGS</div><div class="ska">currency "INR", yearStart "apr"</div></div>
+          <div class="sk"><div class="skk"><i class="e-exp"></i>SETTLE#9c0e…</div><div class="ska">from, to, amount, date (someone paid someone back)</div></div>
         </div>
         <div class="side-parts">
-          <div class="part"><div class="part-h"><b>PK = WHATSAPP#+91…</b><span>phone → user</span></div>
+          <div class="part"><div class="part-h"><b>PK = USER#&lt;sub&gt;</b><span>the person</span></div>
+            <div class="sk"><div class="skk"><i class="e-set"></i>PROFILE</div><div class="ska">email, name, theme, dateFormat, defaultLedgerId, email preferences</div></div>
+            <div class="sk"><div class="skk"><i class="e-wa"></i>WHATSAPP</div><div class="ska">phoneNumber "+91…"</div></div></div>
+          <div class="part"><div class="part-h"><b>PK = PHONE#+91…</b><span>phone → user</span></div>
             <div class="sk"><div class="skk"><i class="e-wa"></i>LINK</div><div class="ska">userId</div></div></div>
           <div class="part"><div class="part-h"><b>PK = LINKCODE#QQ9HON</b><span>pending link</span></div>
-            <div class="sk"><div class="skk"><i class="e-wa"></i>PENDING</div><div class="ska">userId, ttl <span class="ttl">expires 15 min</span></div></div></div>
-          <div class="card"><h4>Why two link items?</h4><p>The webhook knows only the phone; the app knows only the user. Writing both directions makes each lookup a single <code>GetItem</code> without a GSI.</p></div>
+            <div class="sk"><div class="skk"><i class="e-wa"></i>PENDING</div><div class="ska">userId <span class="ttl">15 min</span></div></div></div>
+          <div class="part"><div class="part-h"><b>PK = SYSTEM</b><span>bookkeeping</span></div>
+            <div class="sk"><div class="skk"><i class="e-set"></i>MIGRATION#001</div><div class="ska">appliedAt, counts</div></div></div>
+          <div class="card"><h4>On every item</h4><p><code>type</code> (e.g. <code>Expense</code>) and <code>v</code> (schema version written with), so a future migration can find exactly what it needs to change.</p></div>
           <div class="legend" style="font-size:13px;color:var(--muted)">
-            <span><i class="e-exp"></i>Expense</span><span><i class="e-bud"></i>Budget</span><span><i class="e-sav"></i>Savings</span><span><i class="e-set"></i>Settings</span><span><i class="e-wa"></i>WhatsApp</span></div>
+            <span><i class="e-exp"></i>Money &amp; email</span><span><i class="e-bud"></i>Budget</span><span><i class="e-sav"></i>Savings</span><span><i class="e-set"></i>Household &amp; people</span><span><i class="e-wa"></i>Links &amp; invites</span></div>
         </div>
       </div>
 
@@ -644,25 +682,74 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
       <div class="tbl-wrap"><table>
         <thead><tr><th>Need</th><th>Operation</th><th>Key condition</th></tr></thead>
         <tbody>
-          <tr><td>Load the ledger</td><td class="mono">Query (paginated)</td><td class="mono">PK = USER#sub, begins_with(SK, "EXPENSE#")</td></tr>
-          <tr><td>Budgets / savings entries / goals</td><td class="mono">Query</td><td class="mono">begins_with(SK, "BUDGET#" | "SAVINGS_ENTRY#" | "SAVINGS_GOAL#")</td></tr>
-          <tr><td>Settings, link status</td><td class="mono">GetItem</td><td class="mono">SK = SETTINGS | WHATSAPP_LINK</td></tr>
-          <tr><td>Who sent this WhatsApp message?</td><td class="mono">GetItem</td><td class="mono">PK = WHATSAPP#phone, SK = LINK</td></tr>
-          <tr><td>Redeem a link code</td><td class="mono">GetItem → Put ×2 → Delete</td><td class="mono">PK = LINKCODE#code, SK = PENDING</td></tr>
+          <tr class="grp"><td colspan="3">Base table</td></tr>
+          <tr><td>A household's expenses / budgets / rules</td><td class="mono">Query</td><td class="mono">PK = LEDGER#lid, begins_with(SK, "EXP#" | "BUDGET#" | "RECUR#" …)</td></tr>
+          <tr><td>Am I a member, and with which role?</td><td class="mono">GetItem</td><td class="mono">LEDGER#lid / MEMBER#sub (every request)</td></tr>
+          <tr><td>Profile, settings, WhatsApp sender</td><td class="mono">GetItem</td><td class="mono">USER#sub / PROFILE · LEDGER#lid / SETTINGS · PHONE#num / LINK</td></tr>
+          <tr class="grp"><td colspan="3">GSI1 · lookups</td></tr>
+          <tr><td>Which households am I in?</td><td class="mono">Query</td><td class="mono">GSI1PK = USER#sub</td></tr>
+          <tr><td>Invites for my (verified) email</td><td class="mono">Query</td><td class="mono">GSI1PK = INVITE#email</td></tr>
+          <tr><td>Bills due today, every household</td><td class="mono">Query</td><td class="mono">GSI1PK = DUE#yyyy-mm, GSI1SK ≤ today (this and last month)</td></tr>
+          <tr><td>Split balances</td><td class="mono">Query</td><td class="mono">GSI1PK = LEDGER#lid#SPLIT, plus SETTLE# items</td></tr>
+          <tr><td>Every household (scheduled jobs)</td><td class="mono">Query</td><td class="mono">GSI1PK = LEDGERS</td></tr>
+          <tr class="grp"><td colspan="3">GSI2 · by date</td></tr>
+          <tr><td>Expenses or savings in a date range</td><td class="mono">Query</td><td class="mono">GSI2PK = LEDGER#lid#EXP, GSI2SK between from and to</td></tr>
         </tbody></table></div>
-      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">At a few thousand items per user a full-partition query is well within limits. If a user ever grows very large, a date-sortable key such as <code>EXPENSE#&lt;isoDate&gt;#&lt;uuid&gt;</code> would allow range queries.</p>
+      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">No scans in request paths; the only scan was the one-off v1 → v2 copy. Only items that need a lookup carry index attributes, so each item costs at most two extra index writes.</p>
+
+      <h3>Writes</h3>
+      <div class="grid3">
+        <div class="card"><span class="why">Concurrency</span><h4>Change fields, not items</h4><p><code>db.update_fields</code> sets or removes single attributes and fails if the item is gone, so two people editing at once don't undo each other.</p></div>
+        <div class="card"><span class="why">Idempotency</span><h4>Repeat-safe by key</h4><p>Recurring expenses use ids like <code>r-&lt;rule&gt;-&lt;date&gt;</code> with put-if-absent; email markers work the same way.</p></div>
+        <div class="card"><span class="why">Bulk</span><h4>Batches for imports</h4><p><code>POST /expenses/batch</code> (100) and <code>/batch-delete</code> (500) use <code>BatchWriteItem</code>; multi-item changes like an ownership handover use a transaction.</p></div>
+      </div>
+
+      <h3>Migrations</h3>
+      <div class="pipe">
+        <span class="pp">cdk deploy Api</span><span class="arr">→</span>
+        <span class="pp">CDK Trigger</span><span class="arr">→</span>
+        <span class="pp">migrate Lambda</span><span class="arr">→</span>
+        <span class="pp warn">run migrations not in SYSTEM / MIGRATION#*</span><span class="arr">→</span>
+        <span class="pp">record each one</span>
+      </div>
+      <div class="prose" style="margin-top:12px"><p>Each migration is a numbered module in <code>backend/api/migrations/</code> with an <code>ID</code> and a <code>run()</code>. A failed one isn't recorded and fails the deploy, so it runs again next time. Migrations only write items that are absent, so a re-run never overwrites changes users made in the meantime. Additive changes (a new optional field) need no migration. A change to the key design gets a new table, as v1 → v2 did; the old table is retained, so rolling back means pointing <code>TABLE_NAME</code> at it.</p></div>
+
+      <h3>Why one table</h3>
+      <div class="grid2">
+        <div class="card"><span class="why">Scaling · a strength</span><h4>Capacity grows by partition</h4><p>DynamoDB scales per partition key, not per table, so more tables would add no capacity. Each household is a small, separate partition; a million families is a million small partitions. One table also keeps transactions across entity types, permissions, backups and alarms in one place.</p></div>
+        <div class="card"><span class="why">Querying · the trade-off</span><h4>Planned questions only</h4><p>Every screen asks "this household, maybe a date range", which the keys answer in one partition read. Unplanned questions, such as spend across all households, need a new index or a scan, and there is no server-side <code>SUM</code> or <code>GROUP BY</code>; totals are computed in the browser.</p></div>
+      </div>
+      <div class="tbl-wrap" style="margin-top:14px"><table>
+        <thead><tr><th>If the product needs</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td>Analytics or ad-hoc SQL over all data</td><td>Keep DynamoDB for the app; add DynamoDB export to S3 and query it with Athena</td></tr>
+          <tr><td>Server-side reporting, rich filters, full-text search</td><td>PostgreSQL (RDS or Aurora), at the cost of sizing, patching and Lambda connection handling</td></tr>
+          <tr><td>Neither</td><td>Stay as is</td></tr>
+        </tbody></table></div>
+
+      <h3>Known scale limits</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Limit</th><th>Matters at</th><th>Fix</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Every household sits under one GSI1 key, <code>LEDGERS</code>; the jobs walk it one by one</td><td>~100k households</td><td>Shard to <code>LEDGERS#0..N</code> and run shards in parallel</td><td><span class="status st-warn">planned</span></td></tr>
+          <tr><td>The app downloads a household's full expense history on open</td><td>~10k entries in one household</td><td>Load by period with <code>GET /expenses?start=&amp;end=</code> (GSI2 exists)</td><td><span class="status st-warn">planned</span></td></tr>
+          <tr><td><code>DUE#&lt;month&gt;</code> holds every active rule due that month</td><td>very large rule counts</td><td>Add a day or shard suffix</td><td><span class="status st-ok">fine</span></td></tr>
+        </tbody></table></div>
 
       <h3>S3 receipts</h3>
-      <div class="fig-frame"><div class="s3path"><span>receipts/</span><span class="v">&lt;sub&gt;</span><span>/</span><span class="v">&lt;uuid&gt;</span><span>.jpg | png | webp | heic</span></div>
-        <div class="fig-cap"><span>Block-all-public-access and SSE-S3. Access only through presigned URLs scoped to the caller's prefix, valid 300 s. The PUT pins Content-Type but does not cap size.</span></div></div>
+      <div class="fig-frame"><div class="s3path"><span>receipts/</span><span class="v">&lt;householdId&gt;</span><span>/</span><span class="v">&lt;uuid&gt;</span><span>.jpg | png | webp | heic</span></div>
+        <div class="fig-cap"><span>Block-all-public-access and SSE-S3. Access only through presigned URLs scoped to the household's prefix, valid 300 s. Pre-v2 receipts keep <code>receipts/&lt;sub&gt;/</code>, allowed through the household's <code>legacyReceiptPrefix</code>. The PUT pins Content-Type but does not cap size.</span></div></div>
 
       <h3>Browser storage</h3>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Key</th><th>Where</th><th>Purpose</th></tr></thead>
         <tbody>
           <tr><td class="mono">CognitoIdentityServiceProvider.*</td><td>localStorage</td><td>Cognito tokens (Amplify default)</td></tr>
+          <tr><td class="mono">etp:ledger:&lt;userId&gt;</td><td>localStorage</td><td>Last household opened</td></tr>
           <tr><td class="mono">etp:migrated:&lt;userId&gt;</td><td>localStorage</td><td>Local → cloud migration already handled</td></tr>
-          <tr><td class="mono">etp:dashboardRange</td><td>localStorage</td><td>Last dashboard period</td></tr>
+          <tr><td class="mono">etp:dashboardRange · etp:trendPrefs</td><td>localStorage</td><td>Last dashboard period and trend chart controls</td></tr>
+          <tr><td class="mono">etp-offline</td><td>IndexedDB</td><td>Cached API reads and the queue of expenses added offline</td></tr>
+          <tr><td class="mono">sw.js cache</td><td>Cache Storage</td><td>App shell, so the installed app opens offline</td></tr>
           <tr><td class="mono">ExpenseTrackerDB</td><td>IndexedDB</td><td>Legacy pre-cloud data, read once by MigrationGate</td></tr>
         </tbody></table></div>
     </section>
@@ -670,22 +757,28 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
     <!-- §9 API -->
     <section class="sec" id="api">
       <div class="sec-h"><span class="sec-n">§9</span><h2>API reference</h2>
-        <p>JSON bodies with camelCase fields. Everything needs <code>Authorization: Bearer &lt;ID token&gt;</code> except the two routes marked public. Swagger UI runs at <code>/docs</code> locally.</p></div>
+        <p>JSON bodies with camelCase fields. Everything needs <code>Authorization: Bearer &lt;ID token&gt;</code> except the two routes marked public. Household data takes <code>X-Ledger-Id</code>; without it the caller's default household is used. The role column shows the least role needed. Swagger UI runs at <code>/docs</code> locally.</p></div>
       <div class="search"><input id="api-q" type="search" placeholder="Filter by path, method or note" aria-label="Filter endpoints"><small id="api-n"></small></div>
       <div class="tbl-wrap"><table id="api-tbl">
-        <thead><tr><th>Method</th><th>Path</th><th>Body → response</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Method</th><th>Path</th><th>Body → response</th><th>Role</th><th>Notes</th></tr></thead>
         <tbody></tbody></table></div>
       <h3>Schemas <span class="tag">models.py ⇄ types/index.ts</span></h3>
-      <div class="code"><button class="copy" type="button">Copy</button><pre><span class="h">Expense</span>        { id, date, amount, category, description, paymentMethod?, tags?, receiptUrl?, createdAt, updatedAt }
-<span class="h">ExpenseCreate</span>  { date, amount, category, description, paymentMethod?, tags?, receiptUrl? }
-<span class="h">Settings</span>       { currency = "INR", dateFormat = "DD/MM/YYYY", theme = "system", locale = "en-IN" }
+      <div class="code"><button class="copy" type="button">Copy</button><pre><span class="h">Expense</span>        { id, date, amount, category, description, paymentMethod?, tags?, receiptUrl?,
+                 paidBy?, split?, recurringId?, createdBy?, createdByName?, createdAt, updatedAt }
+<span class="h">Split</span>          { shares: [{ person: "m:&lt;sub&gt;"|"n:&lt;name&gt;", amount }] }   <span class="c"># shares must add up to amount</span>
+<span class="h">Settings</span>       { currency = "INR", yearStart = "jan"|"apr", dateFormat, theme, locale }   <span class="c"># first two per household, rest per person</span>
+<span class="h">Me</span>             { userId, email, name, defaultLedgerId, ledgers: LedgerSummary[], invites: Invite[], preferences, emailSendingEnabled }
+<span class="h">LedgerSummary</span>  { id, name, role, ownerId, isPersonal, memberCount }
+<span class="h">Invite</span>         { ledgerId, ledgerName, email, role, invitedByName, expiresAt }
+<span class="h">RecurringRule</span>  { id, description, amount, category, frequency, dayOfMonth?, weekday?, startDate, endDate?, autoLog, active, nextDue }
+<span class="h">Balances</span>       { people: [{ ref, name, isMember, net }], transfers: [{ fromPerson, toPerson, amount }], splitExpenses, settlements }
 <span class="h">Budget</span>         { category, monthlyLimit?, yearlyLimit?, budgetType = "monthly"|"yearly", alertThreshold = 80, isActive = true }
 <span class="h">SavingsEntry</span>   { id, date, amount, category, description, account?, interestRate?, maturityDate?, isRecurring?, tags?, createdAt, updatedAt }
 <span class="h">SavingsGoal</span>    { id, name, targetAmount, currentAmount, deadline?, category, priority = "low"|"medium"|"high"|"critical", isActive, createdAt }
 
 <span class="c"># paymentMethod: cash | card | upi | netbanking | cheque | other
-# category is a free string on the API; the 81-value CategoryType union lives only in the frontend
-# no bulk endpoints: imports and restores fan out to single calls, 5 at a time (mapWithConcurrency)</span></pre></div>
+# frequency: weekly | monthly | quarterly | yearly · roles: owner | editor | viewer
+# imports and restores use POST /expenses/batch (100) and /expenses/batch-delete (500)</span></pre></div>
     </section>
 
     <!-- §10 stack -->
@@ -703,7 +796,8 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <div class="row"><dt>three.js + R3F + drei</dt><dd>3D walkthrough, lazy-loaded</dd></div>
           <div class="row"><dt>AWS Amplify<small>v6</small></dt><dd>Auth client only, no Amplify backend</dd></div>
           <div class="row"><dt>papaparse · xlsx · jsPDF · modern-screenshot</dt><dd>Import, export, PDF, dashboard snapshot</dd></div>
-          <div class="row"><dt>date-fns 4 · idb</dt><dd>Dates; legacy IndexedDB for migration</dd></div>
+          <div class="row"><dt>date-fns 4 · idb</dt><dd>Dates; offline cache and add queue in IndexedDB</dd></div>
+          <div class="row"><dt>Service worker + web manifest</dt><dd>Installable app, offline shell, home-screen shortcuts</dd></div>
         </dl></div>
         <div class="stack-col"><h4>Backend</h4><dl>
           <div class="row"><dt>Python<small>3.12</small></dt><dd>Lambda x86_64, 256 MB, 15 s timeout</dd></div>
@@ -712,12 +806,16 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
           <div class="row"><dt>Mangum<small>0.19</small></dt><dd>HTTP API events ⇄ ASGI</dd></div>
           <div class="row"><dt>boto3</dt><dd>DynamoDB resource API, S3 presigned URLs</dd></div>
           <div class="row"><dt>python-multipart</dt><dd>Parses Twilio's form-encoded webhook</dd></div>
+          <div class="row"><dt>pytest + moto<small>dev only</small></dt><dd>42 tests against a mocked DynamoDB and S3</dd></div>
         </dl></div>
         <div class="stack-col"><h4>Infrastructure</h4><dl>
           <div class="row"><dt>AWS CDK v2<small>aws-cdk-lib 2.170.0</small></dt><dd>Python; CLI from npm</dd></div>
           <div class="row"><dt>API Gateway HTTP API</dt><dd>v2, Cognito JWT authorizer</dd></div>
-          <div class="row"><dt>Lambda</dt><dd>One function, the whole API</dd></div>
-          <div class="row"><dt>DynamoDB</dt><dd>Single table, on-demand, TTL</dd></div>
+          <div class="row"><dt>Lambda</dt><dd>API, jobs and migrate functions, one code bundle</dd></div>
+          <div class="row"><dt>DynamoDB</dt><dd>Single table v2, two GSIs, on-demand, TTL, PITR</dd></div>
+          <div class="row"><dt>EventBridge</dt><dd>Three schedules for the jobs Lambda</dd></div>
+          <div class="row"><dt>CDK Triggers</dt><dd>Run data migrations after each API deploy</dd></div>
+          <div class="row"><dt>SES v2</dt><dd>Budget and summary emails, off until a domain is verified</dd></div>
           <div class="row"><dt>S3 + CloudFront</dt><dd>Site with OAC; receipts with presigned URLs</dd></div>
           <div class="row"><dt>Cognito</dt><dd>User pool + Google and Facebook</dd></div>
           <div class="row"><dt>Secrets Manager</dt><dd>Resolved at deploy time</dd></div>
@@ -740,6 +838,10 @@ footer{border-top:1px solid var(--line);padding-block:26px;color:var(--faint);fo
         </tbody></table></div>
       <div class="code" style="margin-top:12px"><button class="copy" type="button">Copy</button><pre>aws secretsmanager put-secret-value --region ap-southeast-2 \
   --secret-id expense-track-pro/twilio-auth-token --secret-string '&lt;value&gt;'</pre></div>
+
+      <h3>Switching on email</h3>
+      <p class="muted" style="max-width:75ch;margin-bottom:12px;font-size:14.5px">Emails stay in each household's outbox until SES can send from a verified domain. After verifying the domain in SES (ap-southeast-2) and leaving the SES sandbox, deploy the Api stack with the sender set:</p>
+      <div class="code"><button class="copy" type="button">Copy</button><pre>cdk deploy ExpenseTrack-Api-dev -c emailEnabled=true -c emailFrom="ExpenseTrack Pro &lt;hello@yourdomain&gt;"</pre></div>
 
       <h3>Keep the origin lists in sync</h3>
       <p class="muted" style="max-width:75ch;margin-bottom:12px;font-size:14.5px">Allowed today: <code>http://localhost:5173</code>, <code>http://localhost:5193</code> and the CloudFront URL. A new origin, such as a custom domain, has to be added in all five places.</p>
@@ -796,11 +898,16 @@ docker run -d -p 8001:8000 amazon/dynamodb-local
 export AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_DEFAULT_REGION=ap-southeast-2
 export AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8001
 
-<span class="c"># 3) same key schema as the CDK table</span>
+<span class="c"># 3) same keys and indexes as the CDK table</span>
 aws dynamodb create-table --endpoint-url http://localhost:8001 \
   --table-name expense-track-pro-local \
   --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+    AttributeName=GSI1PK,AttributeType=S AttributeName=GSI1SK,AttributeType=S \
+    AttributeName=GSI2PK,AttributeType=S AttributeName=GSI2SK,AttributeType=S \
   --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+  --global-secondary-indexes \
+    'IndexName=GSI1,KeySchema=[{AttributeName=GSI1PK,KeyType=HASH},{AttributeName=GSI1SK,KeyType=RANGE}],Projection={ProjectionType=ALL}' \
+    'IndexName=GSI2,KeySchema=[{AttributeName=GSI2PK,KeyType=HASH},{AttributeName=GSI2SK,KeyType=RANGE}],Projection={ProjectionType=ALL}' \
   --billing-mode PAY_PER_REQUEST
 
 <span class="c"># 4) run the API</span>
@@ -808,12 +915,17 @@ cd backend/api
 python3 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -r requirements.txt uvicorn
 TABLE_NAME=expense-track-pro-local STAGE=dev uvicorn main:app --reload --port 8000</pre></div>
-        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="c"># X-Local-User-Id stands in for a signed-in user (never accepted in prod)</span>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="c"># X-Local-User-* headers stand in for a signed-in user (never accepted in prod)</span>
 curl localhost:8000/health
-curl -H "X-Local-User-Id: test-user" localhost:8000/expenses
+curl -H "X-Local-User-Id: test-user" -H "X-Local-User-Email: test@example.com" localhost:8000/me
+curl -H "X-Local-User-Id: test-user" localhost:8000/expenses   <span class="c"># default household</span>
 curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json" \
   -d '{"date":"2026-10-09T00:00:00Z","amount":250,"category":"grocery","description":"Weekly groceries"}' \
   localhost:8000/expenses</pre></div>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="c"># backend tests: moto mocks DynamoDB and S3, no AWS needed</span>
+cd backend/api
+pip install -r requirements.txt -r requirements-dev.txt
+python3 -m pytest -q        <span class="c"># 42 passed</span></pre></div>
         <p class="callout">The frontend can't point at the local API as-is: it always sends a Cognito token to the hard-coded <code>API_BASE_URL</code>. Use mode A for UI work and mode B for API work. Receipts need a real bucket; the webhook needs a token and a correctly signed request.</p>
       </div>
       <div class="mode" data-panel="C" hidden>
@@ -826,7 +938,7 @@ curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json"
     <!-- §13 deploy -->
     <section class="sec" id="deploy">
       <div class="sec-h"><span class="sec-n">§13</span><h2>Test &amp; deploy</h2>
-        <p>No automated test suite yet. Deploys are CDK change sets; a failed stack update rolls back automatically.</p></div>
+        <p>A pytest suite covers the backend. Deploys are CDK change sets; a failed stack update, including a failed migration, rolls back automatically.</p></div>
       <h3 style="margin-top:0">Routine frontend release</h3>
       <div class="pipe">
         <span class="pp">npm run build:aws</span><span class="arr">→</span>
@@ -840,13 +952,13 @@ curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json"
         <thead><tr><th>You changed</th><th>Run</th></tr></thead>
         <tbody>
           <tr><td>Frontend code</td><td class="mono">npm run build:aws → cdk deploy ExpenseTrack-Frontend-dev --exclusively</td></tr>
-          <tr><td>API code or dependencies</td><td class="mono">cdk deploy ExpenseTrack-Api-dev --exclusively</td></tr>
+          <tr><td>API code, jobs, migrations or dependencies</td><td class="mono">cdk deploy ExpenseTrack-Api-dev --exclusively <span class="muted">(runs pending migrations)</span></td></tr>
           <tr><td>Cognito or IdP settings</td><td class="mono">cdk deploy ExpenseTrack-Auth-dev --exclusively</td></tr>
           <tr><td>Table or bucket settings</td><td class="mono">cdk deploy ExpenseTrack-Data-dev --exclusively</td></tr>
           <tr><td>Alarms</td><td class="mono">cdk deploy ExpenseTrack-Monitoring-dev --exclusively</td></tr>
           <tr><td>A secret's value</td><td class="mono">put-secret-value, then redeploy the stack that uses it</td></tr>
         </tbody></table></div>
-      <p class="callout ember" style="margin-top:12px"><b>Watch for replacements in Auth and Data.</b> A new user pool means every user signs up again; a replaced table loses its data outside prod. If <code>cdk diff</code> shows <code>[-]/[+]</code> with “replace”, stop and rethink.</p>
+      <p class="callout ember" style="margin-top:12px"><b>Watch for replacements in Auth and Data.</b> A new user pool means every user signs up again; a replaced table loses its data outside prod. If <code>cdk diff</code> shows <code>[-]/[+]</code> with “replace”, stop and rethink. Removing an output another stack imports also fails the deploy; the v1 table's exports survived the switch because the Api stack still reads that table for migrations.</p>
 
       <h3>First-time setup</h3>
       <ol class="firsttime">
@@ -865,14 +977,15 @@ curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json"
       <div class="tbl-wrap"><table>
         <thead><tr><th>Check</th><th>Command</th><th>Status</th></tr></thead>
         <tbody>
+          <tr><td>Backend tests</td><td class="mono">cd backend/api &amp;&amp; python3 -m pytest -q</td><td><span class="status st-ok">42 passing</span></td></tr>
           <tr><td>Production build</td><td class="mono">npm run build:aws</td><td><span class="status st-ok">must pass</span></td></tr>
           <tr><td>CDK synth</td><td class="mono">cdk synth</td><td><span class="status st-ok">must pass</span> needs dist-aws</td></tr>
           <tr><td>Type check</td><td class="mono">npx tsc -b</td><td><span class="status st-warn">~24 old errors</span></td></tr>
           <tr><td>Lint</td><td class="mono">npm run lint</td><td><span class="status st-warn">~70 old errors</span></td></tr>
           <tr><td>Deployed smoke test</td><td class="mono">curl &lt;ApiUrl&gt;/health → ok · /expenses → 401</td><td><span class="status st-ok">manual</span></td></tr>
-          <tr><td>Release checklist</td><td>sign-up, OAuth, CRUD, dashboard periods, PDFs, backup, receipts, WhatsApp, phone + dark mode</td><td><span class="status st-ok">manual</span></td></tr>
+          <tr><td>Release checklist</td><td>sign-up, OAuth, CRUD, invite → accept as viewer and editor, split → settle up, recurring bill, FY dashboard, offline add → sync, PDFs, backup, receipts, WhatsApp, phone + dark mode</td><td><span class="status st-ok">manual</span></td></tr>
         </tbody></table></div>
-      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">Next steps: pytest with FastAPI TestClient and moto for the backend, Vitest for <code>period.ts</code> and backup validation, Playwright end to end, and a GitHub Actions workflow running build, lint, tests and <code>cdk synth</code>.</p>
+      <p class="muted" style="margin-top:10px;font-size:14px;max-width:75ch">Next steps: Vitest for <code>period.ts</code>, split maths and backup validation, Playwright end to end, and a GitHub Actions workflow running build, lint, pytest and <code>cdk synth</code>.</p>
     </section>
 
     <!-- §14 ops -->
@@ -886,9 +999,11 @@ curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json"
         <div class="alarm"><b>ApiHighLatencyAlarm</b><span>HTTP API Latency · p99 over 5 min</span><span class="status st-bad">≥ 3000 ms × 2</span></div>
         <div class="alarm"><b>TableThrottledRequestsAlarm</b><span>DynamoDB throttled requests · Sum over 5 min</span><span class="status st-bad">≥ 1</span></div>
       </div>
-      <div class="code" style="margin-top:14px"><button class="copy" type="button">Copy</button><pre>aws logs tail /aws/lambda/&lt;ApiFunctionName&gt; --follow --region ap-southeast-2   <span class="c"># FastAPI tracebacks for any 500</span></pre></div>
+      <div class="code" style="margin-top:14px"><button class="copy" type="button">Copy</button><pre>aws logs tail /aws/lambda/&lt;ApiFunctionName&gt; --follow --region ap-southeast-2       <span class="c"># FastAPI tracebacks for any 500</span>
+aws logs tail /aws/lambda/&lt;JobsFunctionName&gt; --since 1d --region ap-southeast-2     <span class="c"># recurring, alerts, summary runs</span>
+aws logs tail /aws/lambda/&lt;MigrateFunctionName&gt; --since 1d --region ap-southeast-2  <span class="c"># migration counts per deploy</span></pre></div>
       <div class="grid2" style="margin-top:14px">
-        <div class="card"><h4>Cost</h4><p>Everything is pay-per-use, so an idle stage costs close to nothing. Watch Secrets Manager (about $0.40 per secret per month), Cognito MAUs past the free tier, and Twilio once off the trial.</p></div>
+        <div class="card"><h4>Cost</h4><p>Everything is pay-per-use, so an idle stage costs close to nothing. Watch Secrets Manager (about $0.40 per secret per month), Cognito MAUs past the free tier, point-in-time recovery storage, SES once sending, and Twilio once off the trial.</p></div>
         <div class="card"><h4>Account constraints</h4><p>Regional resources must be in ap-southeast-2: no Lambda@Edge, StackSets or cross-Region replication. Sudden <code>AccessDenied</code> usually means the project's spend limit was hit.</p></div>
       </div>
     </section>
@@ -906,18 +1021,23 @@ curl -X POST -H "X-Local-User-Id: test-user" -H "Content-Type: application/json"
       <div class="sec-h"><span class="sec-n">§16</span><h2>Known limits &amp; tech debt</h2>
         <p>What to fix before a real launch.</p></div>
       <ul class="debt">
-        <li>No automated tests or CI.</li>
-        <li>Old TypeScript and ESLint errors; <code>npm run build</code> fails, <code>build:aws</code> skips the type check.</li>
+        <li>Backend tests exist; no frontend tests and no CI yet.</li>
+        <li>Old TypeScript and ESLint errors in older files; <code>npm run build</code> fails, <code>build:aws</code> skips the type check.</li>
         <li>Pool ids and API URL are hard-coded instead of injected per stage with <code>import.meta.env</code>.</li>
         <li>Cognito's default sender is capped at 50 emails a day; move to SES.</li>
         <li>Tokens live in localStorage. Consider cookie storage, shorter lifetimes and refresh-token rotation.</li>
-        <li>No GSIs or date-sorted keys; loading a ledger is a full-partition query.</li>
+        <li>The app loads a household's whole expense list, and the jobs walk one <code>LEDGERS</code> index key; both have planned fixes (§8).</li>
+        <li>No server-side aggregation or ad-hoc querying; add DynamoDB export to S3 and Athena if analytics are needed.</li>
+        <li>The schema-v1 table is retained; remove it and <code>LEGACY_TABLE_NAME</code> once v2 is verified everywhere.</li>
+        <li>Emails are built but not sent until a domain is verified in SES; invites are in-app only until then.</li>
+        <li>Offline mode queues new expenses only; edits need a connection.</li>
+        <li>Deleting a household leaves its receipt photos in S3.</li>
         <li>Receipt uploads aren't size-limited or checked after upload.</li>
         <li>WhatsApp runs on Twilio's trial sender (5 numbers), and the real Auth Token isn't stored yet.</li>
         <li>No custom domain; the site uses the CloudFront default.</li>
         <li>Old GitHub Pages scripts and the <code>/ExpenseTrack-Pro/</code> base path still exist.</li>
       </ul>
-      <footer>ExpenseTrack Pro · drawn from the repository README (commit 2524066) and source, October 2026.</footer>
+      <footer>ExpenseTrack Pro · drawn from the repository README (commit 8cf9d8a) and source, November 2026 · schema v2.</footer>
     </section>
   </main>
 </div>
@@ -932,10 +1052,10 @@ function markers(svg,id,cls){const d=S('defs',{},svg);const m=S('marker',{id:id,
 
 /* ───────── §1 HLD ───────── */
 const HN=[
- {id:'browser',x:30,y:170,w:180,h:170,t:'Browser',sub:['React 19 SPA','Amplify Auth v6','cloudApi.ts'],tier:'client',
-  k:'Client · frontend/',d:'The single-page app, served from CloudFront. Amplify keeps the Cognito session; services/cloudApi.ts is the only HTTP client and attaches the ID token to every call.',
-  pts:['Sections are tab state in App.tsx (no router)','Uploads receipts straight to S3 with presigned URLs','Provider chain: ErrorBoundary → Toast → Confirm → AuthGate → MigrationGate → App'],files:['main.tsx','App.tsx','services/cloudApi.ts','config/amplify.ts']},
- {id:'phone',x:30,y:580,w:180,h:52,t:"User's WhatsApp",sub:['“450 dinner zomato”'],tier:'client',
+ {id:'browser',x:30,y:170,w:180,h:170,t:'Browser',sub:['React 19 SPA · PWA','Amplify Auth v6','cloudApi.ts'],tier:'client',
+  k:'Client · frontend/',d:'The single-page app, served from CloudFront and installable on a phone. Amplify keeps the Cognito session; services/cloudApi.ts is the only HTTP client and sends the ID token and the current household (X-Ledger-Id) on every call.',
+  pts:['Sections are tab state in App.tsx (no router)','HouseholdProvider picks the household and remounts the app when it changes','Offline: cached reads and a queue of new expenses in IndexedDB, synced on reconnect','Uploads receipts straight to S3 with presigned URLs'],files:['main.tsx','App.tsx','services/cloudApi.ts','services/offline.ts','public/sw.js']},
+ {id:'phone',x:30,y:654,w:180,h:52,t:"User's WhatsApp",sub:['“450 dinner zomato”'],tier:'client',
   k:'Client · messaging',d:'After a one-time link, a user can text an expense to the app number and it lands in their ledger.',
   pts:['Link once: “LINK <code>” with a 6-character code from the app','Then any message with an amount, e.g. “150 auto”','The phone must first join the Twilio trial sender'],files:['components/whatsapp/']},
  {id:'cf',x:290,y:80,w:180,h:60,t:'CloudFront',sub:['d3bttra9tv41h7 · OAC'],tier:'aws',
@@ -953,19 +1073,31 @@ const HN=[
  {id:'apigw',x:290,y:360,w:180,h:72,t:'API Gateway',sub:['HTTP API v2','Cognito JWT authorizer'],tier:'aws',
   k:'Api stack · hbsqcepav7',d:'Verifies the ID token (signature, issuer = pool, audience = client) before Lambda runs. Bad or missing token returns 401 from the gateway.',
   pts:['/{proxy+} behind the authorizer','/health and /whatsapp/webhook are public literal routes','CORS preflight answered by the gateway; OPTIONS not routed'],files:['stacks/api_stack.py']},
- {id:'lambda',x:520,y:360,w:180,h:72,t:'Lambda',sub:['FastAPI + Mangum','py3.12 · 256 MB · 15 s'],tier:'aws',
-  k:'Api stack · backend/api/',d:'One function runs the whole FastAPI app. It reads the already-verified sub claim and never validates tokens itself.',
-  pts:['7 routers: health, expenses, settings, budgets, savings, receipts, whatsapp','Presigns S3 URLs; files never pass through it','Bundled without Docker (manylinux wheels)'],files:['lambda_handler.py','main.py','dependencies/auth.py','db.py']},
- {id:'receipts',x:750,y:272,w:180,h:64,t:'S3 receipts',sub:['receipts/<sub>/<uuid>'],tier:'data',
-  k:'Data stack',d:'Private bucket for receipt photos, SSE-S3 encrypted. The browser reads and writes only with 300-second presigned URLs scoped to its own prefix.',
-  pts:['jpeg, png, webp or heic only','View URL is refused (403) outside the caller’s prefix','No size cap yet'],files:['stacks/data_stack.py','routers/receipts.py']},
- {id:'ddb',x:750,y:384,w:180,h:64,t:'DynamoDB',sub:['single table · PK / SK'],tier:'data',
-  k:'Data stack · expense-track-pro-dev',d:'One table, on-demand, TTL on the ttl attribute. Everything a user owns is in partition USER#<sub>; no secondary indexes.',
-  pts:['Load ledger = one paginated Query','WhatsApp links stored in both directions','PITR enabled in prod only'],files:['stacks/data_stack.py','db.py']},
- {id:'cw',x:520,y:530,w:180,h:56,t:'CloudWatch',sub:['5 alarms · λ · API · table'],tier:'ops',
+ {id:'lambda',x:520,y:360,w:180,h:72,t:'API Lambda',sub:['FastAPI + Mangum','py3.12 · 256 MB · 15 s'],tier:'aws',
+  k:'Api stack · backend/api/',d:'One function runs the whole FastAPI app. It reads the already-verified claims, then checks the caller belongs to the requested household with the role the route needs.',
+  pts:['12 routers, incl. ledgers (households), recurring, splits, notifications','Every route declares Depends(reader | editor | owner)','Presigns S3 URLs; files never pass through it','Bundled without Docker (manylinux wheels)'],files:['main.py','dependencies/auth.py','dependencies/ledger.py','keys.py','db.py']},
+ {id:'receipts',x:750,y:272,w:180,h:64,t:'S3 receipts',sub:['receipts/<lid>/<uuid>'],tier:'data',
+  k:'Data stack',d:'Private bucket for receipt photos, SSE-S3 encrypted. The browser reads and writes only with 300-second presigned URLs scoped to the household’s prefix.',
+  pts:['jpeg, png, webp or heic only','View URL is refused (403) outside the household’s prefix (pre-v2 receipts keep receipts/<sub>/, allowed via the household’s legacy prefix)','No size cap yet'],files:['stacks/data_stack.py','routers/receipts.py']},
+ {id:'ddb',x:750,y:384,w:180,h:64,t:'DynamoDB',sub:['v2 · PK/SK + GSI1 + GSI2'],tier:'data',
+  k:'Data stack · expense-track-pro-v2-dev',d:'One table, on-demand, TTL on ttl, point-in-time recovery on. Each household is partition LEDGER#<id>; GSI1 (lookups) and GSI2 (by date) are sparse and overloaded. The schema-v1 table is retained beside it.',
+  pts:['Every item carries type and v (schema version)','No scans in request paths','Edits update single attributes, never stale whole items','Deletion protection in prod'],files:['stacks/data_stack.py','keys.py','db.py','docs/data-model.md']},
+ {id:'migrate',x:750,y:80,w:180,h:60,t:'Migrate Lambda',sub:['CDK Trigger · after deploy'],tier:'aws',
+  k:'Api stack · migrations/',d:'Runs after every API update and applies any numbered migration not yet recorded under SYSTEM / MIGRATION#<id>, once per table, in order. A failure fails the deploy.',
+  pts:['m001 copied the v1 table into v2 on first deploy','Writes only what is absent, so re-runs never overwrite users’ changes','Gets the legacy table name as LEGACY_TABLE_NAME'],files:['migrate_handler.py','migrations/__init__.py','migrations/m001_user_to_ledger.py']},
+ {id:'eb',x:290,y:520,w:180,h:60,t:'EventBridge',sub:['3 schedules (IST)'],tier:'aws',
+  k:'Api stack',d:'Three cron rules invoke the jobs Lambda with a job name.',
+  pts:['recurring · 00:30 IST daily','budget_alerts · 20:00 IST daily','monthly_summary · 09:00 IST on the 1st'],files:['stacks/api_stack.py']},
+ {id:'jobs',x:520,y:520,w:180,h:64,t:'Jobs Lambda',sub:['recurring · alerts','5 min timeout'],tier:'aws',
+  k:'Api stack · jobs_handler.py',d:'Logs recurring bills that are due, checks budgets against thresholds and builds the monthly summary for every household.',
+  pts:['Finds due bills through GSI1 DUE#<month>, not by scanning','Deterministic expense ids, so a bill is never logged twice','“Already sent” markers stop duplicate emails'],files:['jobs_handler.py','services/recurring.py','services/notify.py']},
+ {id:'ses',x:750,y:524,w:180,h:56,t:'SES',sub:['sending off for now'],tier:'aws',
+  k:'Email',d:'Budget alerts and monthly summaries go out through SES once EMAIL_ENABLED and EMAIL_FROM are set. Until then each email is stored in the household’s outbox and previewed in the app.',
+  pts:['Outbox items expire after 30 days','Each member chooses which emails they get'],files:['services/notify.py','routers/notifications.py']},
+ {id:'cw',x:520,y:604,w:180,h:56,t:'CloudWatch',sub:['5 alarms · λ · API · table'],tier:'ops',
   k:'Monitoring stack',d:'Watches Lambda errors and throttles, API 5xx and p99 latency, and DynamoDB throttling.',
   pts:['Each alarm fires on ≥ 1 in 5 minutes, latency on ≥ 3 s twice','Missing data is not breaching'],files:['stacks/monitoring_stack.py']},
- {id:'sns',x:750,y:530,w:180,h:56,t:'SNS topic',sub:['→ alert email'],tier:'ops',
+ {id:'sns',x:750,y:604,w:180,h:56,t:'SNS topic',sub:['→ alert email'],tier:'ops',
   k:'Monitoring stack',d:'expense-track-pro-alerts-dev with one email subscription.',
   pts:['Confirm the subscription email once, or nothing is delivered','ALERT_EMAIL env var overrides the address'],files:['stacks/monitoring_stack.py','app.py']},
  {id:'google',x:1000,y:190,w:155,h:48,t:'Google',sub:['openid email profile'],tier:'ext',
@@ -993,12 +1125,16 @@ const HE=[
  {f:'lambda',t:'receipts',d:'M670,360 V320 H746',l:'presign',lx:708,ly:320},
  {f:'lambda',t:'ddb',d:'M700,410 H746',l:'boto3',lx:723,ly:410},
  {f:'twilio',t:'apigw',d:'M996,492 H400 V435',l:'POST /whatsapp/webhook · X-Twilio-Signature',lx:690,ly:492},
- {f:'phone',t:'twilio',d:'M210,606 H1077 V528',both:1,l:'“LINK QQ9HON” · “150 auto”',lx:600,ly:606},
- {f:'cw',t:'sns',d:'M700,558 H746'}
+ {f:'phone',t:'twilio',d:'M210,680 H1077 V528',both:1,l:'“LINK QQ9HON” · “150 auto”',lx:600,ly:680},
+ {f:'cw',t:'sns',d:'M700,632 H746'},
+ {f:'eb',t:'jobs',d:'M470,550 H516',l:'cron',lx:493,ly:550},
+ {f:'jobs',t:'ddb',d:'M700,536 H725 V432 H746',l:'boto3',lx:725,ly:470},
+ {f:'jobs',t:'ses',d:'M700,560 H746',dash:1},
+ {f:'migrate',t:'ddb',d:'M930,110 H950 V416 H934',dash:1,l:'after deploy',lx:950,ly:360}
 ];
 (function(){
  const svg=document.getElementById('hld-svg');markers(svg,'hah','ah');
- [{x:10,y:36,w:232,h:606,l:'CLIENTS',c:'z-client'},{x:262,y:36,w:700,h:606,l:'AWS · AP-SOUTHEAST-2 (SYDNEY)',c:'z-aws'},{x:980,y:36,w:190,h:606,l:'THIRD PARTIES',c:'z-ext'}]
+ [{x:10,y:36,w:232,h:680,l:'CLIENTS',c:'z-client'},{x:262,y:36,w:700,h:680,l:'AWS · AP-SOUTHEAST-2 (SYDNEY)',c:'z-aws'},{x:980,y:36,w:190,h:680,l:'THIRD PARTIES',c:'z-ext'}]
   .forEach(function(z){S('rect',{x:z.x,y:z.y,width:z.w,height:z.h,rx:14,class:'z '+z.c},svg);T(svg,z.x+14,z.y+22,z.l,'z-label');});
  const eg=S('g',{},svg),lg=S('g',{},svg),ng=S('g',{},svg);
  HE.forEach(function(e,i){
@@ -1053,12 +1189,28 @@ const HE=[
 /* ───────── §6 Sequence flows ───────── */
 const FLOWS=[
  {id:'call',tab:'Authenticated API call',title:'An authenticated API call',
-  sum:'Loading the ledger. The authorizer rejects bad tokens at the edge, so the Lambda only ever reads the sub claim.',
-  where:['services/cloudApi.ts','api_stack.py authorizer','dependencies/auth.py','routers/expenses.py'],gap:190,
-  p:[['B','Browser','cloudApi.ts'],['A','Amplify','aws-amplify/auth'],['G','API Gateway','JWT authorizer'],['L','Lambda','FastAPI'],['D','DynamoDB','single table']],
-  s:[['B','A','fetchAuthSession()'],['A','B','ID token (refreshed if expired)',1],['B','G','GET /expenses\nAuthorization: Bearer <idToken>'],['G','G','verify signature,\niss = pool, aud = client'],
-     ['note','G','L','Invalid or missing token → 401 here; the Lambda never runs'],['G','L','event + authorizer.jwt.claims'],['L','L','Mangum → FastAPI\nget_user_id() = claims.sub'],
-     ['L','D','Query PK = USER#sub\nbegins_with(SK, "EXPENSE#")'],['D','L','items (paginated)',1],['L','B','200 Expense[] (camelCase JSON)',1],['B','B','ISO strings → Date']]},
+  sum:'Loading a household’s ledger. The gateway rejects bad tokens; the app then checks the caller is a member of the household the browser asked for.',
+  where:['services/cloudApi.ts','api_stack.py authorizer','dependencies/ledger.py','routers/expenses.py'],gap:190,
+  p:[['B','Browser','cloudApi.ts'],['A','Amplify','aws-amplify/auth'],['G','API Gateway','JWT authorizer'],['L','Lambda','FastAPI'],['D','DynamoDB','v2 table']],
+  s:[['B','A','fetchAuthSession()'],['A','B','ID token (refreshed if expired)',1],['B','G','GET /expenses\nBearer <idToken> · X-Ledger-Id: <lid>'],['G','G','verify signature,\niss = pool, aud = client'],
+     ['note','G','L','Invalid or missing token → 401 here; the Lambda never runs'],['G','L','event + authorizer.jwt.claims'],['L','L','get_identity()\n= sub, email, verified'],
+     ['L','D','GetItem LEDGER#lid / MEMBER#sub'],['D','L','{ role: "editor" } (none → 403)',1],
+     ['L','D','Query PK = LEDGER#lid\nbegins_with(SK, "EXP#")'],['D','L','items (paginated)',1],['L','B','200 Expense[] (camelCase JSON)',1],['B','B','ISO strings → Date']]},
+ {id:'invite',tab:'Invite a family member',title:'Inviting someone to a household',
+  sum:'Invites are addressed to an email and matched only on a verified email, so nobody can claim an invite by changing their address.',
+  where:['routers/ledgers.py','components/household/','auth_stack.py keep_original'],gap:185,
+  p:[['O','Owner','HouseholdPanel'],['L','Lambda','routers/ledgers'],['D','DynamoDB','v2 table'],['M','Invitee','InviteBanner']],
+  s:[['O','L','POST /ledgers/{lid}/invites\n{ email, role: "editor" }'],['L','L','caller is owner?\n< 20 members?'],['L','D','put INVITE#email\nGSI1 INVITE#email · ttl 14 days'],['L','O','201 Invite',1],
+     ['note','O','M','Email sending is off for now, so the invite shows up in the app'],
+     ['M','L','GET /me (signs in with that email)'],['L','D','Query GSI1 PK = INVITE#email'],['L','M','invites: [ Priya’s household ]',1],
+     ['M','L','POST /invites/{lid}/accept'],['L','L','email verified?\nelse 403'],['L','D','transact: put MEMBER#sub,\ndelete INVITE#email'],['L','M','LedgerSummary (role editor)',1]]},
+ {id:'recur',tab:'Recurring bill',title:'A recurring bill logs itself',
+  sum:'The daily job reads only what is due through a monthly index partition. Each occurrence has a fixed id, so running twice never logs a bill twice.',
+  where:['jobs_handler.py','services/recurring.py','routers/recurring.py'],gap:200,
+  p:[['E','EventBridge','00:30 IST'],['J','Jobs Lambda','recurring'],['D','DynamoDB','v2 table'],['B','Browser','DueSoon']],
+  s:[['E','J','{ job: "recurring" }'],['J','D','Query GSI1 DUE#2026-11\nSK ≤ today (+ last month)'],['D','J','rules due (rent, SIP, gym…)',1],
+     ['J','D','re-read rule + META\n(skip if deleted)'],['J','D','put EXP#r-<rid>-2026-11-05\nif not exists'],['J','D','update RECUR#: nextDue,\nGSI1SK → next month'],
+     ['note','J','B','Opening the app also runs POST /recurring/run for that household'],['B','B','“Due soon” card lists\nbills in the next days']]},
  {id:'signup',tab:'Email sign-up',title:'Email sign-up and verification',
   sum:'Everything happens in the in-app AuthCard. Cognito sends the branded 6-digit code; autoSignIn skips a second password prompt.',
   where:['components/auth/AuthCard.tsx','hooks/useAuth.ts','auth_stack.py user_verification'],gap:190,
@@ -1079,15 +1231,15 @@ const FLOWS=[
   p:[['U','App','signed in'],['W','WhatsApp','user’s phone'],['T','Twilio','trial sender'],['L','Lambda','routers/whatsapp'],['D','DynamoDB','table']],
   s:[['U','L','POST /whatsapp/link-code'],['L','D','put LINKCODE#QQ9HON\nPENDING, ttl +15 min'],['L','U','{ code, expiresInSeconds: 900 }',1],
      ['W','T','“LINK QQ9HON”'],['T','L','POST /whatsapp/webhook\nform + X-Twilio-Signature'],['L','L','HMAC-SHA1 check\n(403 if bad)'],
-     ['L','D','put WHATSAPP#phone/LINK,\nUSER#sub/WHATSAPP_LINK; delete code'],['L','T','TwiML “✅ linked”',1],['T','W','reply',1],
-     ['W','T','“150 auto”'],['T','L','POST /whatsapp/webhook'],['L','D','get WHATSAPP#phone → userId\nput EXPENSE#uuid'],['L','T','TwiML “Logged ₹150 · auto rickshaw”',1],['T','W','reply',1]]},
+     ['L','D','put PHONE#phone/LINK,\nUSER#sub/WHATSAPP; delete code'],['L','T','TwiML “✅ linked”',1],['T','W','reply',1],
+     ['W','T','“150 auto”'],['T','L','POST /whatsapp/webhook'],['L','D','get PHONE#phone → userId\nput EXP#id in default household'],['L','T','TwiML “Logged ₹150 · auto rickshaw”',1],['T','W','reply',1]]},
  {id:'receipt',tab:'Receipt upload',title:'Uploading and viewing a receipt',
   sum:'The API only signs URLs. The bytes go straight between the browser and S3, so Lambda’s payload and timeout limits never apply.',
   where:['routers/receipts.py','data_stack.py bucket CORS'],gap:230,
   p:[['B','Browser','expense form'],['L','Lambda','routers/receipts'],['S','S3','receipts bucket']],
-  s:[['B','L','POST /receipts/upload-url\n{ contentType: "image/jpeg" }'],['L','L','type allowed?\nkey = receipts/<sub>/<uuid>.jpg'],['L','B','{ uploadUrl (300 s), key }',1],
+  s:[['B','L','POST /receipts/upload-url\n{ contentType: "image/jpeg" }'],['L','L','editor? type allowed?\nkey = receipts/<lid>/<uuid>.jpg'],['L','B','{ uploadUrl (300 s), key }',1],
      ['B','S','PUT uploadUrl (same Content-Type)'],['S','B','200',1],['B','L','save expense with receiptUrl = key'],
-     ['note','B','S','Later, to show it'],['B','L','GET /receipts/view-url?key=…'],['L','L','key under receipts/<sub>/?\nelse 403'],['L','B','{ viewUrl (300 s) }',1],['B','S','GET viewUrl']]},
+     ['note','B','S','Later, to show it'],['B','L','GET /receipts/view-url?key=…'],['L','L','key under receipts/<lid>/\n(or legacy prefix)? else 403'],['L','B','{ viewUrl (300 s) }',1],['B','S','GET viewUrl']]},
  {id:'delete',tab:'Delete expense',title:'Deleting an expense',
   sum:'A promise-based confirm dialog replaces window.confirm. On success the hook drops the row locally, so the list never blanks behind a spinner.',
   where:['components/ui/ConfirmDialog.tsx','hooks/useExpenses.ts','components/ui/Toast.tsx'],gap:175,
@@ -1101,12 +1253,12 @@ const FLOWS=[
   s:[['U','S','export({ layout })'],['S','F','fetch Fraunces, Karla,\nJetBrains Mono CSS'],['F','S','latin + latin-ext woff2\n→ data: URLs',1],['S','M','render dashboard root\nwith font.cssText'],['M','S','canvas of the live DOM',1],
      ['S','S','cut at [data-snapshot-block]\nboundaries (or one page)'],['S','J','addImage per page'],['J','U','save PDF + toast',1]]},
  {id:'restore',tab:'Backup restore',title:'Restoring a backup (Replace mode)',
-  sum:'There are no bulk endpoints, so a restore fans out to single calls, five at a time, reporting progress per phase.',
-  where:['services/backup.ts','services/cloudApi.ts mapWithConcurrency','backup/BackupRestore.tsx'],gap:185,
-  p:[['U','BackupRestore','dialog'],['B','backup.ts','importBackup'],['C','cloudApi','fan-out × 5'],['A','API','Lambda']],
+  sum:'Expenses move through the batch endpoints, up to 100 per create call and 500 per delete call, so a 1,500-entry restore is about 15 calls.',
+  where:['services/backup.ts','services/cloudApi.ts','backup/BackupRestore.tsx'],gap:185,
+  p:[['U','BackupRestore','dialog'],['B','backup.ts','importBackup'],['C','cloudApi','batches'],['A','API','Lambda']],
   s:[['U','B','parseBackupFile(file)'],['B','B','validate version,\nexportDate, data'],['U','U','confirm “Replace all?”'],
-     ['B','C','clearAllExpenses()'],['C','A','DELETE /expenses/{id} × n'],['C','U','progress “clearing”',1],['B','C','clearAllBudgets()'],
-     ['B','C','addExpenses(rows)'],['C','A','POST /expenses × n'],['C','U','progress “expenses”',1],
+     ['B','C','clearAllExpenses()'],['C','A','POST /expenses/batch-delete\n(500 ids per call)'],['C','U','progress “clearing”',1],['B','C','clearAllBudgets()'],
+     ['B','C','addExpenses(rows)'],['C','A','POST /expenses/batch\n(100 per call)'],['C','U','progress “expenses”',1],
      ['B','C','saveBudget() each, then settings'],['C','A','PUT /budgets/{category}, PUT /settings'],['B','U','{ expenses, budgets } imported → toast',1]]}
 ];
 function renderSeq(host,f){
@@ -1176,10 +1328,17 @@ function ladder(host,steps,opt){
 }
 ladder(document.getElementById('lad-auth'),[
  {k:'start',t:'request reaches FastAPI'},
- {k:'q',t:'aws.event has\nclaims.sub?',x:{l:'yes',t:'user id = sub\n(gateway already verified it)',tone:'ok'},c:'no'},
+ {k:'q',t:'aws.event has\nclaims.sub?',x:{l:'yes',t:'Identity(sub, email,\nemail_verified)',tone:'ok'},c:'no'},
  {k:'q',t:'came through\nAPI Gateway?',x:{l:'yes',t:'401 · no authenticated user',tone:'err'},c:'no (uvicorn)'},
  {k:'q',t:'STAGE ≠ prod and\nX-Local-User-Id set?',x:{l:'yes',t:'user id = header value\n(local development only)',tone:'info'},c:'no'},
  {k:'end',t:'401',tone:'err'}
+],{w:520,sx:120,bx:280,dw:200});
+ladder(document.getElementById('lad-ledger'),[
+ {k:'start',t:'route needs a role'},
+ {k:'q',t:'X-Ledger-Id\nheader sent?',x:{l:'no',t:'use the profile’s default\nhousehold (create it if new)',tone:'info'},c:'yes'},
+ {k:'q',t:'MEMBER#sub exists\nin that household?',x:{l:'no',t:'403 · not a member',tone:'err'},c:'yes'},
+ {k:'q',t:'role ≥ needed?\nviewer < editor < owner',x:{l:'no',t:'403 · needs editor / owner',tone:'err'},c:'yes'},
+ {k:'end',t:'LedgerCtx → route runs'}
 ],{w:520,sx:120,bx:280,dw:200});
 ladder(document.getElementById('lad-bucket'),[
  {k:'start',t:'period length in days'},
@@ -1191,49 +1350,76 @@ ladder(document.getElementById('lad-wa'),[
  {k:'start',t:'Twilio POSTs the message'},
  {k:'q',t:'TWILIO_AUTH_TOKEN\nset?',x:{l:'no',t:'503 · integration not configured',tone:'err'},c:'yes'},
  {k:'q',t:'X-Twilio-Signature\nvalid?',x:{l:'no',t:'403 · invalid signature',tone:'err'},c:'yes'},
- {k:'q',t:'body is\n“LINK <code>”?',x:{l:'yes',t:'code found and unexpired? → write WHATSAPP#phone/LINK\nand USER#sub/WHATSAPP_LINK, delete code, reply “✅ linked”.\nOtherwise reply “code isn’t valid or has expired”.',tone:'info'},c:'no'},
- {k:'q',t:'phone linked?\n(WHATSAPP#phone)',x:{l:'no',t:'reply: open the app → Link WhatsApp,\nthen text “LINK <code>”',tone:'info'},c:'yes'},
+ {k:'q',t:'body is\n“LINK <code>”?',x:{l:'yes',t:'code found and unexpired? → write PHONE#phone/LINK\nand USER#sub/WHATSAPP, delete code, reply “✅ linked”.\nOtherwise reply “code isn’t valid or has expired”.',tone:'info'},c:'no'},
+ {k:'q',t:'phone linked?\n(PHONE#phone)',x:{l:'no',t:'reply: open the app → Link WhatsApp,\nthen text “LINK <code>”',tone:'info'},c:'yes'},
  {k:'q',t:'amount found\nin the text?',x:{l:'no',t:'reply: “Try something like ‘150 groceries’”',tone:'info'},c:'yes'},
- {k:'act',t:'category from keywords\nput EXPENSE#uuid'},
+ {k:'act',t:'category from keywords\nput EXP#id (default household)'},
  {k:'end',t:'reply “Logged ₹150 · auto rickshaw”'}
 ],{w:860,bx:330,dw:240,rh:80});
 
 /* ───────── §9 API table ───────── */
 const API=[
- ['Health','GET','/health','→ {"status":"ok"}','',1],
- ['Expenses','GET','/expenses','→ Expense[]','All of the caller’s expenses; paginates DynamoDB internally'],
- ['Expenses','POST','/expenses','ExpenseCreate → Expense (201)','Server assigns id, createdAt, updatedAt; any sent id is ignored'],
- ['Expenses','PUT','/expenses/{id}','ExpenseUpdate → Expense','Partial: omitted fields untouched, null clears a field'],
- ['Expenses','DELETE','/expenses/{id}','→ 204','404 if it isn’t the caller’s'],
- ['Settings','GET','/settings','→ Settings','Defaults INR, DD/MM/YYYY, system, en-IN if never saved'],
- ['Settings','PUT','/settings','Settings → Settings','Upsert'],
- ['Budgets','GET','/budgets','→ Budget[]','One per category'],
- ['Budgets','PUT','/budgets/{category}','Budget → Budget','Upsert keyed by category'],
- ['Budgets','DELETE','/budgets/{category}','→ 204',''],
- ['Savings','GET','/savings/entries','→ SavingsEntry[]',''],
- ['Savings','POST','/savings/entries','SavingsEntryCreate → SavingsEntry',''],
- ['Savings','PUT','/savings/entries/{id}','SavingsEntryUpdate → SavingsEntry',''],
- ['Savings','DELETE','/savings/entries/{id}','→ 204',''],
- ['Savings','GET','/savings/goals','→ SavingsGoal[]',''],
- ['Savings','POST','/savings/goals','SavingsGoalCreate → SavingsGoal',''],
- ['Savings','PUT','/savings/goals/{id}','SavingsGoalUpdate → SavingsGoal',''],
- ['Savings','DELETE','/savings/goals/{id}','→ 204',''],
- ['Receipts','POST','/receipts/upload-url','{contentType} → {uploadUrl, key}','jpeg, png, webp, heic; URL valid 300 s; PUT with the same Content-Type'],
- ['Receipts','GET','/receipts/view-url?key=…','→ {viewUrl}','403 unless the key is under the caller’s prefix; 300 s'],
- ['Receipts','DELETE','/receipts/{key}','→ 204','Same ownership check'],
- ['WhatsApp','POST','/whatsapp/link-code','→ {code, expiresInSeconds, sandboxNumber}','6-character code, valid 15 min'],
- ['WhatsApp','GET','/whatsapp/status','→ {linked, phoneNumber?}',''],
- ['WhatsApp','DELETE','/whatsapp/link','→ 204','Unlinks both directions'],
- ['WhatsApp','POST','/whatsapp/webhook','Twilio form → TwiML XML','403 without a valid signature; 503 if the token isn’t configured',1]
+ ['Health','GET','/health','→ {"status":"ok"}','','',1],
+ ['Me & households','GET','/me','→ Me','Creates the profile and personal household on first call','signed in'],
+ ['Me & households','PUT','/me/preferences','PreferencesUpdate → Preferences','Default household, email choices','signed in'],
+ ['Me & households','POST','/ledgers','{name} → LedgerSummary (201)','New shared household; caller becomes owner','signed in'],
+ ['Me & households','PATCH','/ledgers/{lid}','{name} → LedgerSummary','Rename','owner'],
+ ['Me & households','DELETE','/ledgers/{lid}','→ 204','Deletes everything in it; not your only household','owner'],
+ ['Members & invites','GET','/ledgers/{lid}/members','→ Member[]','','viewer'],
+ ['Members & invites','PUT','/ledgers/{lid}/members/{sub}','{role} → Member','role "owner" hands the household over in one transaction','owner'],
+ ['Members & invites','DELETE','/ledgers/{lid}/members/{sub}','→ 204','Remove someone, or leave (own sub)','owner / self'],
+ ['Members & invites','GET','/ledgers/{lid}/invites','→ Invite[]','Pending, unexpired','owner'],
+ ['Members & invites','POST','/ledgers/{lid}/invites','{email, role} → Invite (201)','Editor or viewer; 14-day expiry; max 20 members','owner'],
+ ['Members & invites','DELETE','/ledgers/{lid}/invites/{email}','→ 204','Withdraw','owner'],
+ ['Members & invites','POST','/invites/{lid}/accept','→ LedgerSummary','Needs a verified email matching the invite','invitee'],
+ ['Members & invites','POST','/invites/{lid}/decline','→ 204','','invitee'],
+ ['Expenses','GET','/expenses?start=&end=','→ Expense[]','All, or a date range through GSI2','viewer'],
+ ['Expenses','POST','/expenses','ExpenseCreate → Expense (201)','Server assigns id and createdBy; split shares must add up','editor'],
+ ['Expenses','POST','/expenses/batch','{items} → Expense[]','Up to 100','editor'],
+ ['Expenses','POST','/expenses/batch-delete','{ids} → 204','Up to 500','editor'],
+ ['Expenses','PUT','/expenses/{id}','ExpenseUpdate → Expense','Partial: omitted fields untouched, null clears','editor'],
+ ['Expenses','DELETE','/expenses/{id}','→ 204','','editor'],
+ ['Recurring','GET','/recurring','→ RecurringRule[]','','viewer'],
+ ['Recurring','POST','/recurring','RecurringInput → RecurringRule (201)','nextDue computed from startDate','editor'],
+ ['Recurring','PUT','/recurring/{id}','RecurringUpdate → RecurringRule','Reschedules from today; never back-fills','editor'],
+ ['Recurring','DELETE','/recurring/{id}','→ 204','','editor'],
+ ['Recurring','POST','/recurring/run','→ {logged, due}','Logs what is due; viewers get the due list only','viewer'],
+ ['Recurring','POST','/recurring/{id}/log','→ Expense','Log the next occurrence now','editor'],
+ ['Recurring','POST','/recurring/{id}/skip','→ RecurringRule','Skip the next occurrence','editor'],
+ ['Splits','GET','/splits/balances','→ Balances','Net per person, plus the fewest payments to settle','viewer'],
+ ['Splits','POST','/splits/settlements','{fromPerson, toPerson, amount, date} → Settlement','Record a payback','editor'],
+ ['Splits','DELETE','/splits/settlements/{id}','→ 204','','editor'],
+ ['Settings','GET','/settings','→ Settings','Household fields merged with personal ones','viewer'],
+ ['Settings','PUT','/settings','Settings → Settings','Viewers may change only their personal fields','viewer'],
+ ['Budgets','GET','/budgets','→ Budget[]','Per category or group:<id>','viewer'],
+ ['Budgets','PUT','/budgets/{category}','Budget → Budget','Upsert','editor'],
+ ['Budgets','DELETE','/budgets/{category}','→ 204','','editor'],
+ ['Categories','GET','/categories','→ {groups, categories}','The household’s own groups and categories','viewer'],
+ ['Categories','PUT','/categories/groups/{id} · /items/{id}','→ group / item','Upsert','editor'],
+ ['Categories','DELETE','/categories/groups/{id} · /items/{id}','→ 204','','editor'],
+ ['Savings','GET','/savings/entries · /goals','→ list','','viewer'],
+ ['Savings','POST','/savings/entries · /goals','Create → item (201)','','editor'],
+ ['Savings','PUT','/savings/entries/{id} · /goals/{id}','Update → item','','editor'],
+ ['Savings','DELETE','/savings/entries/{id} · /goals/{id}','→ 204','','editor'],
+ ['Notifications','GET','/notifications/outbox','→ email[]','Emails built while sending is off','editor'],
+ ['Notifications','GET','/notifications/preview/monthly-summary','→ EmailPreview {kind, subject, html}','Empty html when there is nothing to send','viewer'],
+ ['Notifications','GET','/notifications/preview/budget-alert','→ EmailPreview','','viewer'],
+ ['Receipts','POST','/receipts/upload-url','{contentType} → {uploadUrl, key}','jpeg, png, webp, heic; 300 s','editor'],
+ ['Receipts','GET','/receipts/view-url?key=…','→ {viewUrl}','403 outside the household’s prefix; 300 s','viewer'],
+ ['Receipts','DELETE','/receipts/{key}','→ 204','Same prefix check','editor'],
+ ['WhatsApp','POST','/whatsapp/link-code','→ {code, expiresInSeconds, sandboxNumber}','6-character code, valid 15 min','signed in'],
+ ['WhatsApp','GET','/whatsapp/status','→ {linked, phoneNumber?}','','signed in'],
+ ['WhatsApp','DELETE','/whatsapp/link','→ 204','Unlinks both directions','signed in'],
+ ['WhatsApp','POST','/whatsapp/webhook','Twilio form → TwiML XML','403 without a valid signature; 503 if the token isn’t configured','',1]
 ];
 (function(){
  const tb=document.querySelector('#api-tbl tbody'),q=document.getElementById('api-q'),cnt=document.getElementById('api-n');
  function esc(s){return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
  function draw(){const v=(q.value||'').trim().toLowerCase();let html='',last='',shown=0;
    API.forEach(function(r){if(v&&r.join(' ').toLowerCase().indexOf(v)<0)return;shown++;
-     if(r[0]!==last){html+='<tr class="grp"><td colspan="4">'+esc(r[0])+'</td></tr>';last=r[0];}
-     html+='<tr><td><span class="m m-'+r[1]+'">'+r[1]+'</span></td><td class="mono">'+esc(r[2])+(r[5]?'<span class="open">public</span>':'')+'</td><td class="mono">'+esc(r[3])+'</td><td>'+esc(r[4])+'</td></tr>';});
-   tb.innerHTML=html||'<tr><td colspan="4" class="muted">No endpoint matches “'+esc(v)+'”.</td></tr>';cnt.textContent=shown+' of '+API.length+' endpoints';}
+     if(r[0]!==last){html+='<tr class="grp"><td colspan="5">'+esc(r[0])+'</td></tr>';last=r[0];}
+     html+='<tr><td><span class="m m-'+r[1]+'">'+r[1]+'</span></td><td class="mono">'+esc(r[2])+(r[6]?'<span class="open">public</span>':'')+'</td><td class="mono">'+esc(r[3])+'</td><td class="mono" style="white-space:nowrap">'+esc(r[5])+'</td><td>'+esc(r[4])+'</td></tr>';});
+   tb.innerHTML=html||'<tr><td colspan="5" class="muted">No endpoint matches “'+esc(v)+'”.</td></tr>';cnt.textContent=shown+' of '+API.length+' rows';}
  q.addEventListener('input',draw);draw();
 })();
 
@@ -1252,7 +1438,14 @@ const TS=[
  ['WhatsApp webhook returns 503','TWILIO_AUTH_TOKEN isn’t set on the Lambda. Create the secret and redeploy the Api stack.'],
  ['Sudden AccessDenied on things that worked','Check the AWS project’s spend limit in AWS Settings → Billing.'],
  ['Lambda fails with a form parsing assertion','python-multipart is missing from api/requirements.txt.'],
- ['PDF snapshot shows different fonts or wrapping','The fonts couldn’t be fetched from Google Fonts for embedding. The export still works with fallback fonts.']
+ ['PDF snapshot shows different fonts or wrapping','The fonts couldn’t be fetched from Google Fonts for embedding. The export still works with fallback fonts.'],
+ ['403 “You’re not a member of that household”','The X-Ledger-Id the app sent is for a household the user has left or was removed from. Reloading picks the default household; check members with GET /ledgers/{lid}/members.'],
+ ['Invite doesn’t show up, or accept returns 403','Invites match only a verified email. The invitee must sign in with exactly that address, and email sign-ups must have confirmed their code.'],
+ ['Budget or summary emails never arrive','Sending is off until a domain is verified in SES. Emails are kept in the household’s outbox and previewable under ☰ → Notifications.'],
+ ['Api deploy fails at MigrateFunction/Trigger','A migration raised an error, so CloudFormation rolled back. Read the migrate Lambda’s log, fix, redeploy; the failed migration wasn’t recorded and runs again.'],
+ ['Deploy fails: “Export … cannot be deleted as it is in use”','A stack output that another stack imports was removed. Keep the output for one deploy (for example with stack.export_value), then remove it in the next.'],
+ ['A recurring bill didn’t log','Check the rule is active and its nextDue. The job runs at 00:30 IST; opening the household also runs POST /recurring/run for editors.'],
+ ['Offline entries didn’t appear on another phone','They sync only when the phone that added them is back online with the app open. Its offline banner shows how many are waiting.']
 ];
 (function(){
  const list=document.getElementById('ts-list'),q=document.getElementById('ts-q'),cnt=document.getElementById('ts-n');
@@ -1286,4 +1479,5 @@ document.querySelectorAll('.code .copy').forEach(function(b){b.addEventListener(
 })();
 </script>
 
-</body></html>
+</body>
+</html>

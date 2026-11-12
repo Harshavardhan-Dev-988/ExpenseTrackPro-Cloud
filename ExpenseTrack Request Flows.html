@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>ExpenseTrack Request Flows</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@400;500;600&family=Karla:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a transit map of the system. One fixed map; each flow is a route a request travels,
+   step by step, with a ruled "ledger" of numbered steps beside it. Palette and faces are the app's own "The Ledger". */
+:root{
+  --paper:#EEF1EE; --surface:#FFFFFF; --sunk:#E4E9E3; --ink:#17211D; --muted:#55645D; --faint:#8A958F; --line:#D3D9D1;
+  --pine:#2F4D3F; --pine-soft:rgba(47,77,63,.10); --pine-mid:rgba(47,77,63,.28);
+  --brass:#9A6A24; --brass-soft:rgba(169,118,46,.13); --brass-mid:rgba(169,118,46,.34);
+  --ember:#B3492F; --ember-soft:rgba(179,73,47,.10);
+  --slate:#4B5C70; --slate-soft:rgba(75,92,112,.09);
+  --on-accent:#FFFFFF; --code-bg:#17211D; --code-fg:#E3EAE4; --code-dim:#8FA197;
+  --shadow:0 1px 0 var(--line),0 16px 36px -28px rgba(23,33,29,.5);
+  --display:"Fraunces", Georgia, "Times New Roman", serif;
+  --body:"Karla", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#111915; --surface:#19231E; --sunk:#151E1A; --ink:#ECF1EC; --muted:#A3B1A9; --faint:#76857D; --line:#2C3A32;
+  --pine:#7FAE96; --pine-soft:rgba(127,174,150,.12); --pine-mid:rgba(127,174,150,.32);
+  --brass:#D9A85E; --brass-soft:rgba(217,168,94,.13); --brass-mid:rgba(217,168,94,.34);
+  --ember:#E3876B; --ember-soft:rgba(227,135,107,.13);
+  --slate:#9DB1C7; --slate-soft:rgba(157,177,199,.10);
+  --on-accent:#111915; --code-bg:#0B110E; --code-fg:#DCE5DE; --code-dim:#7D8F85;
+  --shadow:0 1px 0 var(--line),0 16px 36px -28px rgba(0,0,0,.8);
+  color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --paper:#111915; --surface:#19231E; --sunk:#151E1A; --ink:#ECF1EC; --muted:#A3B1A9; --faint:#76857D; --line:#2C3A32;
+  --pine:#7FAE96; --pine-soft:rgba(127,174,150,.12); --pine-mid:rgba(127,174,150,.32);
+  --brass:#D9A85E; --brass-soft:rgba(217,168,94,.13); --brass-mid:rgba(217,168,94,.34);
+  --ember:#E3876B; --ember-soft:rgba(227,135,107,.13);
+  --slate:#9DB1C7; --slate-soft:rgba(157,177,199,.10);
+  --on-accent:#111915; --code-bg:#0B110E; --code-fg:#DCE5DE; --code-dim:#7D8F85;
+  --shadow:0 1px 0 var(--line),0 16px 36px -28px rgba(0,0,0,.8);
+  color-scheme:dark; }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:28px 64px}
+h1,h2,h3{font-family:var(--display);font-weight:600;line-height:1.15;margin:0;text-wrap:balance}
+p{margin:0}
+code,.mono{font-family:var(--mono);font-size:.86em}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--pine);outline-offset:2px;border-radius:6px}
+
+/* Header */
+.top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px 40px;align-items:end;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--pine)}
+.top h1{font-size:clamp(1.9rem,3.6vw,2.9rem);margin:8px 0 10px}
+.top h1 em{font-style:italic;font-weight:400;color:var(--pine)}
+.lede{color:var(--muted);max-width:66ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.lg{display:inline-block;width:26px;height:0;border-top:2.5px solid}
+.lg.req{border-color:var(--pine)} .lg.res{border-color:var(--brass)} .lg.err{border-color:var(--ember)} .lg.later{border-color:var(--faint);border-top-style:dashed}
+.lg.self{width:14px;height:14px;border:2px dashed var(--pine);border-radius:4px}
+.howto{margin-top:12px;font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px}
+kbd{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--surface);color:var(--ink)}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;margin-top:24px}
+.flows{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:4px;max-height:100vh;overflow:auto}
+.fgroup{margin-bottom:16px}
+.fgroup h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:500;margin:0 0 6px 10px}
+.fbtn{display:flex;gap:10px;align-items:baseline;width:100%;text-align:left;border:0;background:none;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:14.5px;line-height:1.3}
+.fbtn small{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fbtn:hover{background:var(--sunk);color:var(--ink)}
+.fbtn[aria-current="true"]{background:var(--pine);color:var(--on-accent);font-weight:600}
+.fbtn[aria-current="true"] small{color:var(--on-accent);opacity:.75}
+main{min-width:0;display:grid;gap:16px;align-content:start}
+
+.fhead{display:grid;gap:6px}
+.fhead h2{font-size:clamp(1.45rem,2.4vw,1.9rem)}
+.fhead p{color:var(--muted);max-width:75ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--muted);margin-top:2px}
+.meta b{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-right:6px}
+
+/* Stage */
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.map-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#map{display:block;width:100%;height:auto;min-width:720px}
+.zone{fill:none;stroke-width:1.2;stroke-dasharray:5 5}
+.z-dev{stroke:var(--slate);fill:var(--slate-soft)} .z-aws{stroke:var(--pine);fill:var(--pine-soft)} .z-ext{stroke:var(--brass);fill:var(--brass-soft)}
+.zl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;fill:var(--muted);font-weight:500}
+.node{cursor:pointer;transition:opacity .35s}
+.node .box{fill:var(--surface);stroke:var(--line);stroke-width:1.3;transition:stroke .25s,fill .25s}
+.node .nt{font-family:var(--body);font-weight:700;font-size:13.5px;fill:var(--ink)}
+.node .ns{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.node .tag{font-family:var(--mono);font-size:9px;letter-spacing:.08em;fill:var(--faint)}
+.node.dim{opacity:.28}
+.node.on .box{stroke:var(--pine);stroke-width:2.2;fill:var(--pine-soft)}
+.node.on.res .box{stroke:var(--brass);fill:var(--brass-soft)}
+.node.on.err .box{stroke:var(--ember);fill:var(--ember-soft)}
+.node.sel .box{stroke-dasharray:4 3}
+.node:focus{outline:none} .node:focus-visible .box{stroke:var(--ink);stroke-width:2.4}
+.work{fill:none;stroke:var(--pine);stroke-width:2;stroke-dasharray:6 5;animation:march 0.9s linear infinite}
+.work.err{stroke:var(--ember)}
+@keyframes march{to{stroke-dashoffset:-22}}
+.ping{fill:none;stroke:var(--pine);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:ping 1.1s ease-out forwards}
+@keyframes ping{from{opacity:.8;transform:scale(1)}to{opacity:0;transform:scale(1.25)}}
+.trail{fill:none;stroke-width:2.4;stroke-linecap:round}
+.trail.req{stroke:var(--pine)} .trail.res{stroke:var(--brass)} .trail.err{stroke:var(--ember)} .trail.later{stroke:var(--faint)}
+.trail.past{stroke-width:1.5;opacity:.28}
+.trail.later.done{stroke-dasharray:6 5}
+.ah-req{fill:var(--pine)} .ah-res{fill:var(--brass)} .ah-err{fill:var(--ember)} .ah-later{fill:var(--faint)}
+.pk circle{stroke:var(--surface);stroke-width:2.5}
+.pk.req circle{fill:var(--pine)} .pk.res circle{fill:var(--brass)} .pk.err circle{fill:var(--ember)} .pk.later circle{fill:var(--faint)}
+.chip-bg{fill:var(--ink)}
+.chip-t{font-family:var(--mono);font-size:10.5px;fill:var(--paper);font-weight:500}
+.pk.res .chip-bg{fill:var(--brass)} .pk.err .chip-bg{fill:var(--ember)}
+.pk.res .chip-t,.pk.err .chip-t{fill:var(--on-accent)}
+
+.about{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);background:var(--sunk);font-size:14px;color:var(--muted);min-height:44px}
+.about b{color:var(--ink);font-weight:700}
+.about .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.cbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:14px;cursor:pointer;font-weight:600}
+.cbtn:hover:not(:disabled){border-color:var(--pine-mid)}
+.cbtn:disabled{opacity:.4;cursor:default}
+.cbtn svg{width:14px;height:14px;fill:currentColor}
+.cbtn.primary{background:var(--pine);border-color:var(--pine);color:var(--on-accent);min-width:104px;justify-content:center}
+.counter{font-family:var(--mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.counter b{color:var(--ink);font-weight:600}
+.speed{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-left:auto}
+.speed button{border:0;background:none;padding:6px 11px;font-family:var(--mono);font-size:12px;cursor:pointer;color:var(--muted)}
+.speed button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.bar{height:3px;background:var(--sunk)}
+.bar i{display:block;height:100%;width:0;background:var(--brass)}
+
+/* Detail + ledger */
+.below{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.step-k{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kind{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.kind.req{background:var(--pine-soft);color:var(--pine)} .kind.res{background:var(--brass-soft);color:var(--brass)}
+.kind.self{background:var(--slate-soft);color:var(--slate)} .kind.err{background:var(--ember-soft);color:var(--ember)}
+.kind.later,.kind.note{background:var(--sunk);color:var(--muted)}
+.route{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.card h3{font-size:1.35rem;margin:10px 0 8px}
+.desc{color:var(--ink);max-width:68ch;display:grid;gap:8px}
+.where{display:flex;gap:8px;align-items:baseline;margin-top:14px;flex-wrap:wrap}
+.where .k,.plabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.file{font-family:var(--mono);font-size:12.5px;background:var(--pine-soft);color:var(--pine);border:1px solid var(--pine-mid);border-radius:6px;padding:2px 8px;overflow-wrap:anywhere}
+.plabel{margin-top:14px;display:block}
+pre.payload{margin:6px 0 0;background:var(--code-bg);color:var(--code-fg);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre;max-width:100%}
+.fail{margin-top:14px;border:1px solid var(--ember);background:var(--ember-soft);border-radius:10px;padding:10px 12px;font-size:14px}
+.fail b{color:var(--ember);font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;display:block;margin-bottom:2px}
+.step-in{animation:rise .35s ease-out}
+@keyframes rise{from{opacity:.25;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.ledger{padding:6px 0}
+.ledger h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:500;margin:8px 18px 6px}
+.ledger ol{list-style:none;margin:0;padding:0}
+.ledger li button{display:grid;grid-template-columns:34px minmax(0,1fr);gap:4px;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:8px 14px 8px 0;cursor:pointer;align-items:baseline}
+.ledger li:first-child button{border-top:0}
+.ledger .n{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:right;font-variant-numeric:tabular-nums}
+.ledger .lt{font-size:14px;color:var(--muted);line-height:1.35;padding-left:8px;border-left:2px solid transparent}
+.ledger .lt small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--faint);overflow-wrap:anywhere}
+.ledger li.done .lt{color:var(--ink)}
+.ledger li.cur button{background:var(--pine-soft)}
+.ledger li.cur .lt{color:var(--ink);font-weight:600;border-left-color:var(--pine)}
+.ledger li.cur .n{color:var(--pine);font-weight:600}
+.ledger li button:hover{background:var(--sunk)}
+.ledger li.k-err .lt{border-left-color:var(--ember)}
+
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--faint)}
+
+@media (max-width:1040px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:16px}
+  .flows{position:static;max-height:none;overflow:visible;display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+  .fgroup{display:flex;gap:4px;align-items:center;margin:0;flex:0 0 auto}
+  .fgroup h4{margin:0 4px 0 6px;white-space:nowrap}
+  .fbtn{white-space:nowrap;width:auto;border:1px solid var(--line);background:var(--surface)}
+  .fbtn small{display:none}
+  .below{grid-template-columns:minmax(0,1fr)}
+  .top{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){
+  .speed{margin-left:0}
+  .card{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  .work,.ping,.step-in{animation:none}
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">ExpenseTrack Pro · for new developers</div>
+      <h1>Follow a request, <em>one hop at a time</em></h1>
+      <p class="lede">Pick a flow and press Play. A dot carries each request across the same map of the system, from the screen to AWS and back. Every step names the file and function that does the work, shows what is sent, and says what can go wrong.</p>
+      <div class="howto"><span><kbd>←</kbd> <kbd>→</kbd> step</span><span><kbd>Space</kbd> play or pause</span><span>Tap any box on the map to learn what it is</span></div>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><i class="lg req"></i>request</span>
+      <span><i class="lg res"></i>response</span>
+      <span><i class="lg self"></i>work inside a box</span>
+      <span><i class="lg later"></i>once email is on</span>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="flows" id="flows" aria-label="Flows"></nav>
+    <main>
+      <div class="fhead" id="fhead"></div>
+      <section class="stage" aria-label="System map">
+        <div class="map-scroll" id="mapScroll"><svg id="map" viewBox="0 0 1000 545" role="img" aria-label="Map of ExpenseTrack Pro: your device, AWS services and outside services"></svg></div>
+        <div class="about" id="about" aria-live="polite"><span class="k">About this box</span><span>Tap any box on the map to see what it does.</span></div>
+        <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+        <div class="controls">
+          <button class="cbtn" id="btnRestart" type="button" aria-label="Back to step 1"><svg viewBox="0 0 16 16"><path d="M3 2h2v12H3zM14 2v12L6 8z"/></svg></button>
+          <button class="cbtn" id="btnPrev" type="button"><svg viewBox="0 0 16 16"><path d="M11 2v12L3 8z"/></svg>Back</button>
+          <button class="cbtn primary" id="btnPlay" type="button"><svg viewBox="0 0 16 16" id="playIcon"><path d="M4 2v12l10-6z"/></svg><span id="playText">Play</span></button>
+          <button class="cbtn" id="btnNext" type="button">Next<svg viewBox="0 0 16 16"><path d="M5 2v12l8-6z"/></svg></button>
+          <span class="counter" id="counter"></span>
+          <div class="speed" role="group" aria-label="Speed">
+            <button type="button" data-s="0.5" aria-pressed="false">0.5×</button>
+            <button type="button" data-s="1" aria-pressed="true">1×</button>
+            <button type="button" data-s="2" aria-pressed="false">2×</button>
+          </div>
+        </div>
+      </section>
+      <div class="below">
+        <article class="card" id="detail" aria-live="polite"></article>
+        <section class="card ledger" aria-label="All steps"><h4>Every step in this flow</h4><ol id="ledger"></ol></section>
+      </div>
+    </main>
+  </div>
+  <footer>ExpenseTrack Pro · drawn from the source at commit 6823641 (schema v2), November 2026. Companion to the Architecture page and the repository README.</footer>
+</div>
+
+<script>
+(function(){
+/* ───────── The map ───────── */
+const NODES={
+ ui:{x:40,y:62,w:210,t:'Screen',s:'React components',z:'dev',about:'The React screen you are looking at: forms, lists, the dashboard. Components live in frontend/src/components/.'},
+ hook:{x:40,y:140,w:210,t:'App state',s:'hooks · providers',z:'dev',about:'State that outlives one screen: AuthGate (signed in?), HouseholdProvider (which household), useExpenses (the list in memory). They call cloudApi and update the screen.'},
+ api:{x:40,y:218,w:210,t:'cloudApi.ts',s:'the one HTTP client',z:'dev',about:'frontend/src/services/cloudApi.ts, the only code that calls our API. It adds the ID token and X-Ledger-Id to every call, caches reads for offline use and queues new expenses while offline.'},
+ amplify:{x:40,y:296,w:210,t:'Amplify Auth',s:'tokens · session',z:'dev',about:'AWS Amplify’s auth library, running in the browser. It talks to Cognito, keeps the tokens in localStorage and refreshes the ID token when it expires. No Amplify backend is used.'},
+ idb:{x:40,y:374,w:210,t:'Browser storage',s:'IndexedDB · localStorage',z:'dev',about:'The browser’s own storage. IndexedDB “etp-offline” holds cached API responses and the offline queue; localStorage holds tokens and small preferences such as the last household.'},
+ wa:{x:40,y:460,w:210,t:'WhatsApp',s:'on the user’s phone',z:'dev',about:'WhatsApp on the user’s phone. After a one-time link, a text like “450 dinner” becomes an expense in their household.'},
+ cf:{x:345,y:62,w:140,t:'CloudFront',s:'serves the app',z:'aws',about:'The CDN that serves the built app (HTML, JS, CSS) from a private S3 bucket. It is not involved in API calls.'},
+ cognito:{x:345,y:170,w:140,t:'Cognito',s:'user pool',z:'aws',about:'The Amazon Cognito user pool. It stores accounts, checks passwords, sends verification codes, brokers Google and Facebook sign-in, and issues the tokens.'},
+ s3:{x:665,y:170,w:140,t:'S3 receipts',s:'private bucket',z:'aws',about:'The private bucket for receipt photos. It can only be reached with short-lived presigned URLs that the API signs.'},
+ apigw:{x:345,y:285,w:140,t:'API Gateway',s:'checks the token',z:'aws',about:'The HTTP API in front of our code. It checks the Cognito ID token on every call before any of our code runs. Two routes are public: /health and the WhatsApp webhook.'},
+ lambda:{x:505,y:285,w:140,t:'API Lambda',s:'FastAPI',z:'aws',about:'One Lambda function running the whole FastAPI app (backend/api/). It checks household membership and role, validates input, and reads and writes DynamoDB.'},
+ ddb:{x:665,y:285,w:140,t:'DynamoDB',s:'v2 table',z:'aws',about:'The table expense-track-pro-v2-<stage>. Each household is one partition, LEDGER#<id>. Two indexes answer lookups (GSI1) and date ranges (GSI2).'},
+ eb:{x:345,y:415,w:140,t:'EventBridge',s:'schedules',z:'aws',about:'Amazon EventBridge schedules. Three cron rules start the jobs Lambda: recurring bills (00:30 IST), budget alerts (20:00 IST), monthly summary (09:00 IST on the 1st).'},
+ jobs:{x:505,y:415,w:140,t:'Jobs Lambda',s:'background work',z:'aws',about:'A second Lambda with the same code bundle, entry point jobs_handler.py. It does the work nobody clicked: logging bills that are due and building emails.'},
+ ses:{x:665,y:415,w:140,t:'SES',s:'email · off for now',z:'aws',about:'Amazon SES sends email. It is switched off until a domain is verified; until then each email is kept in the household’s outbox and can be previewed in the app.'},
+ google:{x:850,y:62,w:125,t:'Google',s:'sign-in',z:'ext',about:'Google’s sign-in. Cognito sends the user there and gets back their email, name and whether the email is verified.'},
+ inbox:{x:850,y:170,w:125,t:'Email inbox',s:'the user’s mail',z:'ext',about:'The user’s email inbox. It receives Cognito’s verification codes now, and budget emails once sending is switched on.'},
+ twilio:{x:850,y:460,w:125,t:'Twilio',s:'WhatsApp gateway',z:'ext',about:'Twilio’s WhatsApp gateway. It forwards each incoming message to our webhook, signed so the API can prove it came from Twilio.'}
+};
+const NH=56;
+const ZONES=[{x:20,y:22,w:250,h:510,l:'YOUR DEVICE',c:'z-dev'},{x:325,y:22,w:495,h:510,l:'AWS · AP-SOUTHEAST-2 (SYDNEY)',c:'z-aws'},{x:835,y:22,w:155,h:510,l:'OUTSIDE SERVICES',c:'z-ext'}];
+
+/* ───────── The flows ─────────
+   k: req | res | self | err | later | note
+   p: the boxes the dot travels through (one box for self/note)
+   l: label on the dot · t: step title · d: what happens · f: where in the code
+   x: what is sent (optional) · w: what can go wrong (optional) */
+const FLOWS=[
+{id:'signup',g:'Getting in',n:'Sign up with email',
+ sum:'A new user creates an account. Cognito does all of it: our API is not involved until the first time the app loads.',
+ starts:'Create account on the sign-in card',ends:'Signed in, app opens',
+ s:[
+ {k:'self',p:['ui'],l:'validate',t:'You fill in the sign-up form',d:'The sign-in card switches to “Create your ledger”. It checks the fields in the browser first: a name, an email, and a password with 8+ characters, an upper-case letter, a lower-case letter and a digit (the user pool’s password policy).',f:'components/auth/AuthCard.tsx · submit()',x:`{ name: "Priya Sharma",
+  email: "priya@example.com",
+  password: "••••••••" }`},
+ {k:'req',p:['ui','amplify'],l:'signUp()',t:'The card asks Amplify to sign up',d:'autoSignIn: true means the user will not have to type the password again after confirming the code.',f:'AuthCard.tsx → aws-amplify/auth signUp()',x:`signUp({
+  username: "priya@example.com",
+  password,
+  options: {
+    userAttributes: { email, name: "Priya Sharma" },
+    autoSignIn: true
+  }
+})`},
+ {k:'req',p:['amplify','cognito'],l:'SignUp',t:'Amplify calls Cognito directly',d:'This goes from the browser straight to Cognito over HTTPS. The password only ever goes to Cognito, never to our API.',f:'Cognito API · SignUp',x:`POST https://cognito-idp.ap-southeast-2.amazonaws.com/
+X-Amz-Target: AWSCognitoIdentityProviderService.SignUp
+{ "ClientId": "4m6v1tcr…", "Username": "priya@example.com", … }`},
+ {k:'self',p:['cognito'],l:'create user',t:'Cognito creates an unconfirmed user',d:'Cognito checks the password policy, stores the user as UNCONFIRMED and makes a 6-digit code.',f:'backend/cdk/stacks/auth_stack.py · user pool settings',w:'An email that already has an account returns UsernameExistsException, and the card shows the error.'},
+ {k:'req',p:['cognito','inbox'],l:'code email',t:'Cognito emails the code',d:'The email uses the branded template “Your ExpenseTrack Pro verification code”, defined in the Auth stack.',f:'auth_stack.py · user_verification',w:'Cognito’s built-in sender allows only 50 emails a day. Past that, codes stop arriving until SES is set up.'},
+ {k:'res',p:['cognito','amplify','ui'],l:'CONFIRM_SIGN_UP',t:'The card switches to the code screen',d:'Cognito answers with the next step, CONFIRM_SIGN_UP, and where the code was sent. The card shows “We sent a code to p***@example.com”.',f:'AuthCard.tsx · mode "confirm"',x:`{ isSignUpComplete: false,
+  nextStep: { signUpStep: "CONFIRM_SIGN_UP",
+    codeDeliveryDetails: { destination: "p***@e***" } } }`},
+ {k:'req',p:['ui','amplify','cognito'],l:'ConfirmSignUp',t:'You type the code',d:'confirmSignUp sends the code to Cognito. Cognito marks the user CONFIRMED and sets email_verified = true. That flag matters later: invites are only matched on a verified email.',f:'AuthCard.tsx → confirmSignUp()',x:`confirmSignUp({ username: "priya@example.com",
+                confirmationCode: "482913" })`,w:'A wrong or expired code returns CodeMismatchException or ExpiredCodeException; the card offers “Send a new code”.'},
+ {k:'res',p:['cognito','amplify'],l:'COMPLETE_AUTO_SIGN_IN',t:'Cognito says the account is ready',d:'Because autoSignIn was requested, the next step is COMPLETE_AUTO_SIGN_IN.',f:'AuthCard.tsx'},
+ {k:'req',p:['amplify','cognito'],l:'SRP sign-in',t:'Amplify signs in without asking again',d:'autoSignIn() runs the same secure password check as a normal login (see “Log in with email”), using the password it still holds in memory.',f:'AuthCard.tsx → autoSignIn()'},
+ {k:'res',p:['cognito','amplify'],l:'tokens',t:'Cognito returns three tokens',d:'An ID token (who you are, 1 hour), an access token (1 hour) and a refresh token (30 days). Amplify stores them in localStorage.',f:'aws-amplify/auth',x:`{ IdToken: "eyJraWQiOi…",      // sent to our API
+  AccessToken: "eyJraWQiOi…",
+  RefreshToken: "eyJjdHkiOi…" } // gets new ID tokens`},
+ {k:'res',p:['amplify','hook','ui'],l:'Hub: signedIn',t:'The app opens',d:'Amplify announces “signedIn” on its event hub. useAuth hears it, AuthGate swaps the sign-in screen for the app, and the “Open the app” flow begins.',f:'hooks/useAuth.ts · components/auth/AuthGate.tsx'}
+ ]},
+{id:'login',g:'Getting in',n:'Log in with email',
+ sum:'A returning user signs in. The password is never sent anywhere: Amplify proves to Cognito that it knows the password using SRP, a challenge-and-response method.',
+ starts:'Sign in on the sign-in card',ends:'Tokens stored, app opens',
+ s:[
+ {k:'self',p:['ui'],l:'form',t:'You enter email and password',d:'The sign-in card checks that both fields are filled in.',f:'components/auth/AuthCard.tsx · mode "signIn"'},
+ {k:'req',p:['ui','amplify'],l:'signIn()',t:'The card asks Amplify to sign in',d:'',f:'AuthCard.tsx → signIn()',x:`signIn({ username: "priya@example.com", password })`},
+ {k:'req',p:['amplify','cognito'],l:'InitiateAuth',t:'Amplify starts the SRP exchange',d:'Amplify sends the username and a random public number, SRP_A. Not the password.',f:'Cognito API · InitiateAuth',x:`{ "AuthFlow": "USER_SRP_AUTH",
+  "AuthParameters": { "USERNAME": "priya@example.com",
+                      "SRP_A": "a91f…" } }`},
+ {k:'res',p:['cognito','amplify'],l:'challenge',t:'Cognito sends a challenge',d:'Cognito answers with a salt and its own public number. Only someone who knows the password can compute the right answer from these.',f:'PASSWORD_VERIFIER challenge',x:`{ "ChallengeName": "PASSWORD_VERIFIER",
+  "ChallengeParameters": { "SALT": "…", "SRP_B": "…", "SECRET_BLOCK": "…" } }`},
+ {k:'req',p:['amplify','cognito'],l:'RespondToAuthChallenge',t:'Amplify answers the challenge',d:'Amplify computes a signature from the password and the challenge, in the browser, and sends only that signature.',f:'Cognito API · RespondToAuthChallenge'},
+ {k:'self',p:['cognito'],l:'verify',t:'Cognito checks the answer',d:'If the signature matches, the password was right.',f:'Cognito',w:'Wrong password: NotAuthorizedException, “Incorrect username or password.” Account never confirmed: the card resends a code and opens the code screen.'},
+ {k:'res',p:['cognito','amplify'],l:'tokens',t:'Cognito returns the tokens',d:'ID token and access token (1 hour each) and a refresh token (30 days).',f:'aws-amplify/auth'},
+ {k:'req',p:['amplify','idb'],l:'save session',t:'Amplify saves the session',d:'The tokens go into localStorage under CognitoIdentityServiceProvider.<clientId>.… so a reload keeps you signed in.',f:'Amplify default token storage'},
+ {k:'res',p:['amplify','hook','ui'],l:'Hub: signedIn',t:'AuthGate shows the app',d:'useAuth hears the “signedIn” event and AuthGate renders the app instead of the sign-in screen.',f:'hooks/useAuth.ts · AuthGate.tsx'},
+ {k:'note',p:['api'],l:'later calls',t:'From now on, every API call carries the ID token',d:'cloudApi asks fetchAuthSession() for the ID token before each call. When it has expired, Amplify swaps the refresh token for a new one without asking you.',f:'services/cloudApi.ts · authHeader()'}
+ ]},
+{id:'google',g:'Getting in',n:'Sign in with Google',
+ sum:'Cognito acts as the go-between: it sends you to Google, gets your details back, and gives the app the same kind of tokens as an email login.',
+ starts:'Continue with Google',ends:'Signed in, app opens',
+ s:[
+ {k:'req',p:['ui','amplify'],l:'signInWithRedirect',t:'You tap “Continue with Google”',d:'',f:'AuthCard.tsx → signInWithRedirect({ provider: "Google" })'},
+ {k:'req',p:['amplify','cognito'],l:'/oauth2/authorize',t:'The browser goes to Cognito’s sign-in domain',d:'Amplify creates a one-time secret (the PKCE verifier) and sends only its hash. The page leaves the app at this point.',f:'config/amplify.ts · oauth settings',x:`GET https://expense-track-pro-dev.auth.ap-southeast-2.amazoncognito.com
+    /oauth2/authorize?identity_provider=Google&response_type=code
+    &client_id=4m6v1tcr…&code_challenge=…&redirect_uri=https://d3bttra9tv41h7.cloudfront.net/`},
+ {k:'req',p:['cognito','google'],l:'redirect',t:'Cognito sends you on to Google',d:'Google shows its own account picker and consent screen.',f:'auth_stack.py · UserPoolIdentityProviderGoogle'},
+ {k:'self',p:['google'],l:'consent',t:'You pick an account and agree',d:'Google shares your email, name and whether the email is verified (openid email profile).',f:'Google'},
+ {k:'res',p:['google','cognito'],l:'/oauth2/idpresponse',t:'Google sends you back to Cognito',d:'With a one-time code that only Cognito can exchange.',f:'Cognito hosted domain',w:'If this redirect URL is missing from the Google Cloud console, Google stops with redirect_uri_mismatch.'},
+ {k:'self',p:['cognito'],l:'map user',t:'Cognito finds or creates the user',d:'Cognito exchanges Google’s code, maps email, name and email_verified onto a pool user (named like Google_1043…). The same Google account always maps to the same user.',f:'auth_stack.py · attribute_mapping'},
+ {k:'res',p:['cognito','ui'],l:'302 → app?code=',t:'Cognito sends you back to the app',d:'The browser returns to the app’s address with a code in the URL.',f:''},
+ {k:'req',p:['ui','cf'],l:'GET /',t:'The app reloads',d:'CloudFront serves index.html and the JavaScript again.',f:'Frontend stack · CloudFront'},
+ {k:'req',p:['amplify','cognito'],l:'/oauth2/token',t:'Amplify exchanges the code for tokens',d:'It sends the code with the PKCE verifier from step 2, which proves this is the same browser that started.',f:'aws-amplify/auth (on load)',x:`POST /oauth2/token
+grant_type=authorization_code&code=…&code_verifier=…`},
+ {k:'res',p:['cognito','amplify'],l:'tokens',t:'Cognito returns the tokens',d:'The same three tokens as an email login.',f:''},
+ {k:'res',p:['amplify','hook','ui'],l:'Hub: signInWithRedirect',t:'The app opens',d:'useAuth hears the event and AuthGate renders the app. A failure event shows an error on the sign-in card instead.',f:'hooks/useAuth.ts'}
+ ]},
+{id:'boot',g:'Getting in',n:'Open the app',
+ sum:'What happens between opening the app and seeing the dashboard: who am I, which household, then load its data.',
+ starts:'Opening the site or the installed app',ends:'Dashboard rendered',
+ s:[
+ {k:'req',p:['ui','cf'],l:'GET /',t:'The browser asks for the app',d:'An installed app gets the app shell from its service worker cache first, so it opens even offline.',f:'public/sw.js · Frontend stack'},
+ {k:'res',p:['cf','ui'],l:'index.html + JS',t:'CloudFront serves the files',d:'From a private S3 bucket that only CloudFront can read.',f:'stacks/frontend_stack.py'},
+ {k:'self',p:['hook'],l:'signed in?',t:'AuthGate checks for a session',d:'main.tsx configures Amplify first. useAuth asks Amplify for the current user. No session means the sign-in screen.',f:'main.tsx · hooks/useAuth.ts · AuthGate.tsx'},
+ {k:'req',p:['hook','api'],l:'getMe()',t:'HouseholdProvider asks “who am I?”',d:'',f:'components/household/HouseholdProvider.tsx'},
+ {k:'req',p:['api','amplify'],l:'fetchAuthSession()',t:'cloudApi gets the ID token',d:'Amplify returns it, refreshing it first if it has expired.',f:'services/cloudApi.ts · authHeader()'},
+ {k:'res',p:['amplify','api'],l:'idToken',t:'Amplify hands back the token',d:'',f:''},
+ {k:'req',p:['api','apigw'],l:'GET /me',t:'cloudApi calls the API',d:'No X-Ledger-Id yet: the app does not know the household until /me answers.',f:'cloudApi.getMe()',x:`GET /me
+Authorization: Bearer eyJraWQiOi…`},
+ {k:'self',p:['apigw'],l:'verify JWT',t:'API Gateway checks the token',d:'The JWT authorizer checks the signature against Cognito’s public keys, the issuer (our user pool), the audience (our app client) and the expiry, before any of our code runs.',f:'stacks/api_stack.py · HttpJwtAuthorizer',w:'Missing, expired or foreign token: 401 from the gateway. The Lambda never runs.'},
+ {k:'req',p:['apigw','lambda'],l:'claims',t:'The request reaches FastAPI',d:'Mangum turns the gateway event into a normal FastAPI request. get_identity() reads the already-verified claims.',f:'dependencies/auth.py · get_identity()',x:`Identity(user_id="8b1f…", email="priya@example.com",
+         name="Priya Sharma", email_verified=True)`},
+ {k:'req',p:['lambda','ddb'],l:'GetItem PROFILE',t:'The API loads your profile',d:'ensure_user() reads USER#<sub>/PROFILE. On your very first visit it creates the profile and a personal household (META plus a MEMBER item with role owner), written “only if absent” so two tabs can’t make two.',f:'services/ledgers.py · ensure_user()'},
+ {k:'req',p:['lambda','ddb'],l:'Query GSI1',t:'Which households, which invites?',d:'Two index lookups: GSI1 USER#<sub> lists your households; GSI1 INVITE#<email> finds invites, only for a verified email.',f:'services/ledgers.py · memberships() · routers/ledgers.py · pending_invites()'},
+ {k:'res',p:['ddb','lambda','apigw','api'],l:'200 Me',t:'The API answers',d:'',f:'routers/ledgers.py · get_me()',x:`{ "userId": "8b1f…",
+  "defaultLedgerId": "3c9e…",
+  "ledgers": [{ "id": "3c9e…", "name": "Sharma household",
+                "role": "owner", "memberCount": 3 }],
+  "invites": [],
+  "emailSendingEnabled": false }`},
+ {k:'self',p:['hook'],l:'pick household',t:'HouseholdProvider picks the household',d:'The last household you opened (localStorage etp:ledger:<user>) if you are still in it, otherwise your default. setCurrentLedger() makes every later call send X-Ledger-Id.',f:'HouseholdProvider.tsx · setCurrentLedger()'},
+ {k:'req',p:['api','apigw','lambda','ddb'],l:'POST /recurring/run',t:'Bills that fell due are logged',d:'Before the data loads, the app asks the API to log any recurring bills that are due, so they appear straight away. The app waits at most 4 seconds for this. Members are loaded at the same time.',f:'HouseholdProvider.tsx · routers/recurring.py · run_due()'},
+ {k:'req',p:['hook','api','apigw','lambda','ddb'],l:'GET /expenses …',t:'The data hooks load the household',d:'useExpenses, useSettings and the budgets load in parallel, each with X-Ledger-Id. Every call checks membership first (one GetItem on MEMBER#<sub>).',f:'hooks/useExpenses.ts · hooks/useSettings.ts'},
+ {k:'res',p:['ddb','lambda','apigw','api','idb'],l:'cache for offline',t:'Responses are cached',d:'Each read is saved in IndexedDB, so the app can still show the household without a connection.',f:'services/offline.ts · saveResponse()'},
+ {k:'res',p:['api','hook','ui'],l:'render',t:'The dashboard appears',d:'Totals, charts and budget status are computed in the browser from the loaded list.',f:'components/dashboard/DashboardView.tsx'}
+ ]},
+{id:'add',g:'Everyday',n:'Add an expense',
+ sum:'The most common request: from the form, through the token and membership checks, to one item in DynamoDB, and back into the list without a reload.',
+ starts:'Add expense button',ends:'Toast “Entry recorded”',
+ s:[
+ {k:'self',p:['ui'],l:'open form',t:'You tap “Add expense”',d:'The expense form opens. View-only members never see this button.',f:'App.tsx · openAddExpenseForm() · components/forms/ExpenseForm.tsx'},
+ {k:'self',p:['ui'],l:'validate()',t:'You fill it in and save',d:'The form checks a date, an amount above zero and a description. For a split, the shares must add up to the amount.',f:'ExpenseForm.tsx · validate()',x:`{ date: 2026-11-12, amount: 450, category: "dine_out",
+  description: "Dinner", paymentMethod: "upi" }`,w:'Missing fields show inline messages such as “Add an amount”; nothing is sent.'},
+ {k:'req',p:['ui','hook'],l:'addExpense()',t:'The form hands the expense to the hook',d:'App.handleAddExpense calls useExpenses.addExpense().',f:'App.tsx · handleAddExpense() → hooks/useExpenses.ts'},
+ {k:'req',p:['hook','api'],l:'createExpense()',t:'The hook calls cloudApi',d:'cloudApi first checks navigator.onLine. Offline, the expense is queued instead (see “Add while offline”).',f:'services/cloudApi.ts · createExpense()'},
+ {k:'req',p:['api','amplify'],l:'fetchAuthSession()',t:'cloudApi gets the ID token',d:'',f:'cloudApi.ts · authHeader()'},
+ {k:'res',p:['amplify','api'],l:'idToken',t:'Amplify hands back the token',d:'',f:''},
+ {k:'req',p:['api','apigw'],l:'POST /expenses',t:'cloudApi sends the request',d:'The household comes from the X-Ledger-Id header, never from the body.',f:'cloudApi.ts · send()',x:`POST /expenses
+Authorization: Bearer eyJraWQiOi…
+X-Ledger-Id: 3c9e…
+Content-Type: application/json
+
+{ "date": "2026-11-12T00:00:00.000Z", "amount": 450,
+  "category": "dine_out", "description": "Dinner",
+  "paymentMethod": "upi" }`},
+ {k:'self',p:['apigw'],l:'verify JWT',t:'API Gateway checks the token',d:'Signature, issuer, audience and expiry.',f:'api_stack.py · authorizer',w:'Bad token: 401 here, and the Lambda never runs.'},
+ {k:'req',p:['apigw','lambda'],l:'claims + body',t:'FastAPI receives the request',d:'Pydantic checks the body against ExpenseCreate: types, required fields, a known payment method.',f:'routers/expenses.py · create_expense() · models.py · ExpenseCreate',w:'A malformed body returns 422 with the field that failed.'},
+ {k:'req',p:['lambda','ddb'],l:'GetItem MEMBER#',t:'Are you an editor here?',d:'The editor dependency reads LEDGER#<lid>/MEMBER#<sub>. Viewer is below editor.',f:'dependencies/ledger.py · editor'},
+ {k:'res',p:['ddb','lambda'],l:'role: editor',t:'Yes, role editor',d:'',f:'',w:'Not a member: 403 “You’re not a member of that household”. A viewer: 403, needs editor.'},
+ {k:'self',p:['lambda'],l:'build item',t:'The API builds the stored item',d:'new_expense() gives it an id, who recorded it and timestamps. expense_item() adds the keys: the household partition, the date index, and type/v for future migrations.',f:'routers/expenses.py · new_expense() · expense_item()',x:`{ "PK": "LEDGER#3c9e…",     "SK": "EXP#0b7c…",
+  "GSI2PK": "LEDGER#3c9e…#EXP", "GSI2SK": "2026-11-12#0b7c…",
+  "type": "Expense", "v": 2,
+  "amount": 450, "category": "dine_out", "description": "Dinner",
+  "createdBy": "8b1f…", "createdByName": "Priya Sharma",
+  "createdAt": "2026-11-12T13:05:44Z" }`},
+ {k:'req',p:['lambda','ddb'],l:'PutItem',t:'One write to DynamoDB',d:'A single PutItem. Because GSI2 keys are set, the expense also shows up in date-range reads.',f:'db.py · put_item()'},
+ {k:'res',p:['ddb','lambda','apigw','api'],l:'201 Expense',t:'The API returns the saved expense',d:'Storage attributes (PK, SK, GSI keys, type, v) are stripped before it goes out.',f:'db.py · public()'},
+ {k:'res',p:['api','hook'],l:'setExpenses',t:'The hook adds it to the list',d:'Dates come back as ISO strings and become Date objects. The new expense is appended to the list in memory, so there is no reload.',f:'cloudApi.ts · parseExpense() · useExpenses.ts'},
+ {k:'res',p:['hook','ui'],l:'toast',t:'You see it',d:'A toast says “Entry recorded · ₹450 · Dinner”, and the dashboard totals recompute in the browser.',f:'App.tsx · toast.success()'}
+ ]},
+{id:'receipt',g:'Everyday',n:'Attach a receipt photo',
+ sum:'The photo goes straight from the browser to S3. The API only signs a short-lived URL, so the image never passes through Lambda.',
+ starts:'Attach photo in the expense form',ends:'Expense saved with its receipt',
+ s:[
+ {k:'self',p:['ui'],l:'pick photo',t:'You attach a photo',d:'JPEG, PNG, WebP or HEIC. The form shows a preview from a local object URL; nothing is uploaded yet.',f:'components/forms/ExpenseForm.tsx'},
+ {k:'req',p:['ui','api'],l:'uploadReceiptFile()',t:'On save, the receipt goes first',d:'handleSubmit uploads the photo before saving the expense, so the expense can store the photo’s key.',f:'ExpenseForm.tsx · handleSubmit() → cloudApi.uploadReceiptFile()'},
+ {k:'req',p:['api','apigw','lambda'],l:'POST /receipts/upload-url',t:'cloudApi asks for an upload URL',d:'',f:'routers/receipts.py · upload_url()',x:`POST /receipts/upload-url
+X-Ledger-Id: 3c9e…
+{ "contentType": "image/jpeg" }`},
+ {k:'self',p:['lambda'],l:'presign',t:'The API signs a URL',d:'It checks you are an editor and the type is allowed, picks a key inside the household’s folder, and signs a PUT URL valid for 300 seconds. Signing happens inside the Lambda; S3 is not called.',f:'receipts.py · generate_presigned_url("put_object")',x:`key = "receipts/3c9e…/5f2a….jpg"`,w:'A type outside the allowed four returns 400.'},
+ {k:'res',p:['lambda','apigw','api'],l:'{ uploadUrl, key }',t:'The URL comes back',d:'',f:'',x:`{ "uploadUrl": "https://expense-track-pro-receipts-dev-….s3.amazonaws.com/receipts/3c9e…/5f2a….jpg?X-Amz-Signature=…&X-Amz-Expires=300",
+  "key": "receipts/3c9e…/5f2a….jpg" }`},
+ {k:'req',p:['api','s3'],l:'PUT photo bytes',t:'The browser uploads to S3 directly',d:'A plain fetch with no Bearer token: the signature in the URL is the permission. The bytes skip Lambda and its 6 MB payload limit.',f:'cloudApi.ts · uploadReceiptFile()'},
+ {k:'self',p:['s3'],l:'check signature',t:'S3 checks the signature',d:'It checks the signature, the expiry and that Content-Type matches what was signed, then stores the photo encrypted (SSE-S3).',f:'stacks/data_stack.py · receipts bucket',w:'A different Content-Type or an expired URL gets 403 from S3; the form says “Couldn’t upload that receipt”.'},
+ {k:'res',p:['s3','api'],l:'200',t:'Upload done',d:'',f:''},
+ {k:'req',p:['api','apigw','lambda','ddb'],l:'POST /expenses',t:'The expense is saved with the key',d:'The same path as “Add an expense”. receiptUrl holds the S3 key, not a URL, because URLs expire.',f:'routers/expenses.py',x:`{ …, "receiptUrl": "receipts/3c9e…/5f2a….jpg" }`},
+ {k:'res',p:['ddb','lambda','apigw','api','hook','ui'],l:'201',t:'The expense appears with a receipt',d:'',f:''},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'GET /receipts/view-url',t:'Later, someone opens the receipt',d:'The API checks the key is inside this household’s folder (or its pre-v2 legacy folder) and signs a GET URL for 300 seconds.',f:'receipts.py · view_url() · _allowed()',w:'A key from another household returns 403.'},
+ {k:'req',p:['ui','s3'],l:'GET image',t:'The browser loads the image from S3',d:'',f:''}
+ ]},
+{id:'split',g:'Everyday',n:'Split a bill, then settle up',
+ sum:'One expense shared between people. The API checks the shares, balances are worked out from the split expenses, and a recorded payback evens them out.',
+ starts:'Split toggle in the expense form',ends:'Balances updated',
+ s:[
+ {k:'self',p:['ui'],l:'equalShares()',t:'You split ₹1,800 three ways',d:'Paid by you, shared by you, Raj (a member) and Asha (not in the app, so a named person). The split editor divides to the paisa: ₹600 each.',f:'components/splits/SplitEditor.tsx · splitMath.ts'},
+ {k:'req',p:['ui','hook','api','apigw','lambda'],l:'POST /expenses',t:'The expense is sent with its shares',d:'People are written as m:<user id> for members and n:<name> for anyone else.',f:'routers/expenses.py · create_expense()',x:`{ "amount": 1800, "description": "Groceries, DMart",
+  "paidBy": "m:8b1f…",
+  "split": { "shares": [
+    { "person": "m:8b1f…", "amount": 600 },
+    { "person": "m:a2c4…", "amount": 600 },
+    { "person": "n:Asha",  "amount": 600 } ] } }`},
+ {k:'self',p:['lambda'],l:'check_split()',t:'The API checks the shares',d:'No negative shares, they add up to the amount (within ₹0.05), nobody appears twice, there is a payer, and every person is m: or n:.',f:'routers/expenses.py · check_split()',w:'Any rule broken returns 400 with a plain message, e.g. “Split shares must add up to the expense amount”.'},
+ {k:'req',p:['lambda','ddb'],l:'PutItem + GSI1',t:'Stored with a split index key',d:'Split expenses also get GSI1PK = LEDGER#<lid>#SPLIT, so balances read only the shared bills, not every expense.',f:'expenses.py · expense_item()'},
+ {k:'res',p:['ddb','lambda','apigw','api','hook','ui'],l:'201',t:'The expense is saved',d:'',f:''},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'GET /splits/balances',t:'You open Splits',d:'',f:'components/splits/SplitsPanel.tsx'},
+ {k:'req',p:['lambda','ddb'],l:'Query GSI1 SPLIT + SETTLE#',t:'The API reads shared bills and paybacks',d:'One index query for split expenses, one partition query for SETTLE# items.',f:'routers/splits.py · compute()'},
+ {k:'self',p:['lambda'],l:'simplify()',t:'Who owes whom',d:'The payer is owed what others’ shares add up to; each sharer owes their share; paybacks are subtracted. simplify() then pairs the biggest debtor with the biggest creditor until everyone is even, which keeps the number of payments low.',f:'splits.py · compute() · simplify()',x:`net:  You +1200 · Raj −600 · Asha −600
+pay:  Raj → You ₹600 · Asha → You ₹600`},
+ {k:'res',p:['lambda','apigw','api','ui'],l:'Balances',t:'Balances are shown',d:'',f:'',x:`{ "people": [{ "ref": "m:8b1f…", "name": "You", "net": 1200 }, …],
+  "transfers": [{ "fromPerson": "m:a2c4…", "toPerson": "m:8b1f…", "amount": 600 }, …] }`},
+ {k:'req',p:['ui','api','apigw','lambda','ddb'],l:'POST /splits/settlements',t:'Raj pays you back and records it',d:'The money moves outside the app (UPI, cash). Recording it stores a SETTLE# item.',f:'splits.py · create_settlement()',x:`{ "fromPerson": "m:a2c4…", "toPerson": "m:8b1f…",
+  "amount": 600, "date": "2026-11-12" }`},
+ {k:'res',p:['ddb','lambda','apigw','api','ui'],l:'balances',t:'Balances update',d:'Now only Asha owes you ₹600.',f:''}
+ ]},
+{id:'offline',g:'Everyday',n:'Add while offline, then sync',
+ sum:'With no signal, reads come from a local cache and new expenses wait in a queue. When the signal returns, the queue is sent in order.',
+ starts:'Losing the connection',ends:'Queue sent, list refreshed',
+ s:[
+ {k:'self',p:['ui'],l:'offline',t:'The phone loses signal',d:'The browser fires “offline”. The offline banner says you are offline and that new expenses will be saved.',f:'components/ui/OfflineBanner.tsx'},
+ {k:'req',p:['ui','hook','api'],l:'createExpense()',t:'You add an expense anyway',d:'cloudApi sees navigator.onLine is false, or the fetch fails with a network error.',f:'services/cloudApi.ts · createExpense()'},
+ {k:'req',p:['api','idb'],l:'enqueue()',t:'It is queued in IndexedDB',d:'The queue item remembers which household it belongs to, so it syncs to the right one even if you switch.',f:'services/offline.ts · enqueue()',x:`{ ledgerId: "3c9e…",
+  tempId: "offline-1731416744000-k3f9a",
+  body: { amount: 120, description: "Chai", … } }`},
+ {k:'res',p:['api','hook','ui'],l:'temp id',t:'It appears in the list straight away',d:'With a temporary “offline-…” id. The banner counts entries waiting to sync.',f:'useExpenses.ts'},
+ {k:'req',p:['ui','api','idb'],l:'cached GET',t:'Reading still works',d:'GET requests are answered from responses cached while online (keyed by household and path).',f:'cloudApi.ts · request() · cachedResponse()',w:'Edits and deletes need a connection: they show “You’re offline — this change needs a connection.”'},
+ {k:'self',p:['ui'],l:'online',t:'The signal comes back',d:'The browser fires “online”, and the banner calls cloudApi.syncOffline().',f:'OfflineBanner.tsx'},
+ {k:'res',p:['idb','api'],l:'syncQueue()',t:'The queue is read in order',d:'',f:'offline.ts · syncQueue()'},
+ {k:'req',p:['api','apigw','lambda','ddb'],l:'POST /expenses',t:'Each queued expense is sent',d:'With its own saved X-Ledger-Id. After each success it is removed from the queue.',f:'cloudApi.ts · syncOffline()',w:'Still offline: it stops and keeps the rest. A 4xx refusal (say you lost editor rights) drops that one item so it can’t block the queue.'},
+ {k:'res',p:['ddb','lambda','apigw','api','hook'],l:'etp:synced',t:'The list refreshes',d:'An “etp:synced” event makes useExpenses reload, so temporary ids are replaced by real ones.',f:'useExpenses.ts · SYNCED_EVENT'}
+ ]},
+{id:'invite',g:'Household',n:'Invite family, accept',
+ sum:'An owner invites by email; the invitee sees it after signing in with that email, and accepting adds them as a member in one transaction.',
+ starts:'☰ → Household → Invite',ends:'New member sees the household',
+ s:[
+ {k:'self',p:['ui'],l:'invite form',t:'Priya invites her mother as a viewer',d:'Viewers can see everything but change nothing. Editors can add and change entries.',f:'components/household/HouseholdPanel.tsx'},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'POST /ledgers/{lid}/invites',t:'The invite is sent to the API',d:'',f:'routers/ledgers.py · create_invite()',x:`POST /ledgers/3c9e…/invites
+{ "email": "mom@example.com", "role": "viewer" }`},
+ {k:'req',p:['lambda','ddb'],l:'checks',t:'The API checks',d:'The caller is the owner, the email looks valid, the person is not already a member, and the household has fewer than 20 members.',f:'ledgers.py · resolve_for(…, "owner")',w:'Not the owner: 403. Already a member: 409. Twenty members: 409.'},
+ {k:'req',p:['lambda','ddb'],l:'PutItem INVITE#',t:'The invite is stored',d:'Under the household, and indexed by email so the invitee can find it. DynamoDB deletes it after 14 days by itself (TTL).',f:'ledgers.py · create_invite()',x:`{ "PK": "LEDGER#3c9e…", "SK": "INVITE#mom@example.com",
+  "GSI1PK": "INVITE#mom@example.com", "GSI1SK": "LEDGER#3c9e…",
+  "role": "viewer", "ttl": 1732626344 }`},
+ {k:'res',p:['ddb','lambda','apigw','api','ui'],l:'201 Invite',t:'It shows as pending',d:'',f:''},
+ {k:'note',p:['ses'],l:'not emailed yet',t:'No email goes out yet',d:'Email sending is off until a domain is verified, so Priya tells her mother to sign up with exactly mom@example.com.',f:''},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'GET /me',t:'Her mother signs in with that email',d:'Through “Sign up with email” or Google. The app then calls /me as usual.',f:'routers/ledgers.py · get_me()'},
+ {k:'req',p:['lambda','ddb'],l:'Query GSI1 INVITE#',t:'The API looks up invites for her email',d:'Only if the email is verified (Cognito code, Google, or Facebook). Expired invites are ignored.',f:'ledgers.py · pending_invites(identity.verified_email)',w:'An unverified email sees no invites, so nobody can claim one by typing someone else’s address.'},
+ {k:'res',p:['ddb','lambda','apigw','api','ui'],l:'invites: [1]',t:'A banner offers Accept or Decline',d:'',f:'components/household/InviteBanner.tsx'},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'POST /invites/{lid}/accept',t:'She taps Accept',d:'',f:'ledgers.py · accept_invite()'},
+ {k:'self',p:['lambda'],l:'verified?',t:'The API re-checks',d:'The invite must exist for her verified email and not be expired.',f:'ledgers.py · _my_invite()',w:'Unverified email: 403 “Verify your email address to accept invites”. Withdrawn or expired: 404.'},
+ {k:'req',p:['lambda','ddb'],l:'TransactWriteItems',t:'Member added, invite removed, together',d:'One transaction puts MEMBER#<her sub> (role viewer, indexed under GSI1 USER#<sub>) and deletes the invite. Both happen or neither does.',f:'db.py · transact()'},
+ {k:'res',p:['ddb','lambda','apigw','api','hook','ui'],l:'LedgerSummary',t:'She is in, view-only',d:'HouseholdProvider switches to the household. A banner explains she has view-only access, and add or edit buttons are hidden.',f:'HouseholdProvider.tsx · InviteBanner.tsx'}
+ ]},
+{id:'recurring',g:'Background',n:'Recurring bill logs itself',
+ sum:'Every night a scheduled job logs the bills that are due, reading only what is due through a monthly index partition.',
+ starts:'00:30 IST every night',ends:'Bills logged, next dates set',
+ s:[
+ {k:'self',p:['eb'],l:'cron 0 19 * * ?',t:'The schedule fires',d:'19:00 UTC is 00:30 IST.',f:'stacks/api_stack.py · events.Rule'},
+ {k:'req',p:['eb','jobs'],l:'{ job: "recurring" }',t:'EventBridge starts the jobs Lambda',d:'',f:'jobs_handler.py · handler()'},
+ {k:'self',p:['jobs'],l:'today() IST',t:'The job works out “today”',d:'In India time, so a bill due on the 5th is logged on the 5th in India.',f:'services/recurring.py · today()'},
+ {k:'req',p:['jobs','ddb'],l:'Query GSI1 DUE#',t:'Find rules that are due',d:'Active rules sit in GSI1 under DUE#<month of next due date>. The job reads this month and last month, up to today. Nothing else is read.',f:'recurring.py · run_all()',x:`Query GSI1  GSI1PK = "DUE#2026-11"  GSI1SK <= "2026-11-12#…"
+Query GSI1  GSI1PK = "DUE#2026-10"  GSI1SK <= "2026-11-12#…"`},
+ {k:'res',p:['ddb','jobs'],l:'3 rules',t:'Rent, SIP and the gym are due',d:'',f:''},
+ {k:'req',p:['jobs','ddb'],l:'GetItem rule + META',t:'Re-read each rule',d:'With a consistent read, because the index copy can lag. A rule or household deleted since is skipped.',f:'recurring.py · run_all()'},
+ {k:'self',p:['jobs'],l:'process_rule()',t:'Work out the dates to log',d:'Every due date up to today (so a missed night catches up), stopping at the rule’s end date. Rules without auto-log are only reported as due.',f:'recurring.py · process_rule()'},
+ {k:'req',p:['jobs','ddb'],l:'PutItem if absent',t:'Log the expense, exactly once',d:'The id is built from the rule and the date, and the write only succeeds if that id is new. Running twice never logs a bill twice.',f:'recurring.py · log_occurrence()',x:`PutItem  SK = "EXP#r-a1f2…-2026-11-05"
+ConditionExpression: attribute_not_exists(PK)`},
+ {k:'req',p:['jobs','ddb'],l:'UpdateItem RECUR#',t:'Move the rule to its next date',d:'Only the changed fields are updated. The index key moves to next month’s partition.',f:'recurring.py · advance() · db.update_fields()',x:`SET nextDue = "2026-12-05", lastLoggedDue = "2026-11-05",
+    GSI1PK = "DUE#2026-12", GSI1SK = "2026-12-05#3c9e…#a1f2…"`},
+ {k:'req',p:['ui','api','apigw','lambda','ddb'],l:'POST /recurring/run',t:'Opening the app runs the same check',d:'For the open household only, so bills appear even before tonight’s run. Viewers just get the list of what is due.',f:'HouseholdProvider.tsx · routers/recurring.py · run_due()'},
+ {k:'res',p:['ddb','lambda','apigw','api','ui'],l:'due soon',t:'You see it on the dashboard',d:'Logged bills appear in the list with a recurring chip, and a “Due soon” card shows what is coming.',f:'components/recurring/DueSoon.tsx'}
+ ]},
+{id:'alerts',g:'Background',n:'Budget alert email',
+ sum:'Every evening the jobs Lambda checks each household’s budgets and builds an alert for anything near or over its limit, at most once per budget per period.',
+ starts:'20:00 IST every evening',ends:'Alert in the outbox (or inbox, once email is on)',
+ s:[
+ {k:'self',p:['eb'],l:'cron 30 14 * * ?',t:'The schedule fires',d:'14:30 UTC is 20:00 IST.',f:'api_stack.py'},
+ {k:'req',p:['eb','jobs'],l:'{ job: "budget_alerts" }',t:'The jobs Lambda starts',d:'',f:'jobs_handler.py'},
+ {k:'req',p:['jobs','ddb'],l:'Query GSI1 LEDGERS',t:'List every household',d:'Each household’s META item is indexed under GSI1PK = LEDGERS. One household failing does not stop the others.',f:'services/notify.py · all_ledger_ids()'},
+ {k:'req',p:['jobs','ddb'],l:'Query BUDGET#, EXP#, SETTINGS',t:'Load a household’s budgets and spending',d:'Monthly budgets use this month. Yearly budgets use the household’s year: April to March when the financial year is on.',f:'notify.py · budget_statuses()'},
+ {k:'self',p:['jobs'],l:'compare',t:'Compare spending with each limit',d:'At or past the alert threshold (80% by default) is “warning”; 100% or more is “exceeded”.',f:'notify.py · budget_statuses()',x:`Groceries  ₹11,240 of ₹13,000  86%  warning
+Dining out ₹6,300 of ₹6,000    105% exceeded`},
+ {k:'req',p:['jobs','ddb'],l:'PutItem SENT# if absent',t:'Only once per budget, period and state',d:'A marker like budget#grocery#2026-11#warning is written only if new. If it already exists, this alert was sent before.',f:'notify.py · _mark_once()'},
+ {k:'self',p:['jobs'],l:'render',t:'Build the email',d:'An HTML and a plain-text version, with amounts in Indian grouping (₹1,23,456), sent to members who want budget alerts.',f:'notify.py · render_budget_alert() · recipients()'},
+ {k:'req',p:['jobs','ddb'],l:'PutItem OUTBOX#',t:'Today: kept in the outbox',d:'Sending is off, so the email is stored in the household’s outbox for 30 days.',f:'notify.py · deliver()',w:'If building or delivering fails, the SENT# markers are removed so the next run tries again.'},
+ {k:'later',p:['jobs','ses','inbox'],l:'SendEmail',t:'Once email is on: sent through SES',d:'With EMAIL_ENABLED and a verified sender, deliver() calls SES instead of writing to the outbox.',f:'notify.py · deliver() · SES v2 send_email'},
+ {k:'req',p:['ui','api','apigw','lambda'],l:'GET /notifications/preview/budget-alert',t:'Meanwhile, preview it in the app',d:'☰ → Notifications shows exactly what would be sent.',f:'components/notifications/NotificationsPanel.tsx · routers/notifications.py'}
+ ]},
+{id:'whatsapp',g:'Background',n:'Text an expense on WhatsApp',
+ sum:'A WhatsApp message becomes an expense. No Cognito token here: Twilio signs each request, and the API checks the signature.',
+ starts:'A text to the app’s WhatsApp number',ends:'Reply “Logged ₹450 · Dining out”',
+ s:[
+ {k:'req',p:['wa','twilio'],l:'“450 dinner zomato”',t:'You send a text',d:'The phone was linked once before, with a 6-character code from the app.',f:'components/whatsapp/'},
+ {k:'req',p:['twilio','apigw','lambda'],l:'POST /whatsapp/webhook',t:'Twilio forwards it to the API',d:'A public route: Twilio has no Cognito token. It sends a form post signed with X-Twilio-Signature.',f:'api_stack.py · public route · routers/whatsapp.py · webhook()',x:`POST /whatsapp/webhook
+X-Twilio-Signature: 3x7Zp…=
+From=whatsapp:+919812345678&Body=450 dinner zomato&…`},
+ {k:'self',p:['lambda'],l:'HMAC-SHA1',t:'The API checks the signature',d:'It recomputes HMAC-SHA1 over the full URL plus every form field (sorted) using the Twilio Auth Token, and compares in constant time.',f:'whatsapp.py · _valid_signature()',w:'Wrong signature: 403. Auth Token not configured: 503.'},
+ {k:'req',p:['lambda','ddb'],l:'GetItem PHONE#',t:'Whose phone is this?',d:'PHONE#+919812345678 / LINK holds the user id.',f:'whatsapp.py',w:'Not linked: the reply explains how to link the phone in the app.'},
+ {k:'self',p:['lambda'],l:'parse',t:'Read the message',d:'The first number is the amount (₹, rs and inr are fine); the rest is the description. A keyword table picks the category: dinner → Dining out.',f:'whatsapp.py · parse_message()',w:'No amount found: the reply suggests “Try something like ‘150 groceries’”.'},
+ {k:'req',p:['lambda','ddb'],l:'pick household',t:'Choose the household',d:'Your default household if you can add entries there, otherwise the first one where you can.',f:'whatsapp.py · _target_ledger()'},
+ {k:'req',p:['lambda','ddb'],l:'PutItem EXP#',t:'Save the expense',d:'Through the same expense_item() as the app, tagged “whatsapp” and recorded as you.',f:'routers/expenses.py · expense_item()'},
+ {k:'res',p:['lambda','apigw','twilio'],l:'TwiML reply',t:'The API answers Twilio',d:'',f:'',x:`<Response><Message>Logged ₹450 · Dining out</Message></Response>`},
+ {k:'res',p:['twilio','wa'],l:'reply',t:'You get a confirmation',d:'The expense is in the household the next time anyone opens the app.',f:''}
+ ]}
+];
+
+/* ───────── SVG helpers ───────── */
+const NS='http://www.w3.org/2000/svg';
+function S(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e;}
+const svg=document.getElementById('map');
+const defs=S('defs',{},svg);
+['req','res','err','later'].forEach(function(k){const m=S('marker',{id:'ah-'+k,viewBox:'0 0 10 10',refX:'8',refY:'5',markerWidth:'6',markerHeight:'6',orient:'auto-start-reverse'},defs);S('path',{d:'M0,0 L10,5 L0,10 z',class:'ah-'+k},m);});
+ZONES.forEach(function(z){S('rect',{x:z.x,y:z.y,width:z.w,height:z.h,rx:14,class:'zone '+z.c},svg);const t=S('text',{x:z.x+14,y:z.y+22,class:'zl'},svg);t.textContent=z.l;});
+const gPast=S('g',{},svg), gNodes=S('g',{},svg), gNow=S('g',{},svg), gPk=S('g',{},svg);
+const about=document.getElementById('about');
+Object.keys(NODES).forEach(function(id){
+  const n=NODES[id];n.h=NH;
+  const g=S('g',{class:'node',tabindex:'0',role:'button','aria-label':n.t+': what is this?'},gNodes);
+  S('rect',{x:n.x,y:n.y,width:n.w,height:NH,rx:10,class:'box'},g);
+  const t=S('text',{x:n.x+14,y:n.y+24,class:'nt'},g);t.textContent=n.t;
+  const s=S('text',{x:n.x+14,y:n.y+41,class:'ns'},g);s.textContent=n.s;
+  n.g=g;
+  function show(){
+    Object.keys(NODES).forEach(function(k){NODES[k].g.classList.toggle('sel',k===id);});
+    about.innerHTML='';
+    const k=document.createElement('span');k.className='k';k.textContent='About this box';
+    const b=document.createElement('b');b.textContent=n.t;
+    const p=document.createElement('span');p.textContent=n.about;
+    about.append(k,b,p);
+  }
+  g.addEventListener('click',show);
+  g.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();show();}});
+});
+function C(id){const n=NODES[id];return {x:n.x+n.w/2,y:n.y+NH/2};}
+function edgeOf(id,toward){
+  const n=NODES[id],c=C(id),dx=toward.x-c.x,dy=toward.y-c.y;
+  if(!dx&&!dy)return c;
+  const sx=(n.w/2+4)/Math.abs(dx||1e-9), sy=(NH/2+4)/Math.abs(dy||1e-9), s=Math.min(sx,sy);
+  return {x:c.x+dx*s,y:c.y+dy*s};
+}
+function seg(a,b){
+  const ca=C(a),cb=C(b),p0=edgeOf(a,cb),p1=edgeOf(b,ca);
+  const mx=(p0.x+p1.x)/2,my=(p0.y+p1.y)/2,dx=p1.x-p0.x,dy=p1.y-p0.y,len=Math.hypot(dx,dy)||1;
+  const bend=Math.min(34,len*0.16);
+  const cx=mx-dy/len*bend, cy=my+dx/len*bend;
+  return {p0:p0,p1:p1,c:{x:cx,y:cy},d:'M'+p0.x.toFixed(1)+','+p0.y.toFixed(1)+' Q'+cx.toFixed(1)+','+cy.toFixed(1)+' '+p1.x.toFixed(1)+','+p1.y.toFixed(1)};
+}
+function qpt(s,t){const u=1-t;return {x:u*u*s.p0.x+2*u*t*s.c.x+t*t*s.p1.x,y:u*u*s.p0.y+2*u*t*s.c.y+t*t*s.p1.y};}
+function kindClass(k){return k==='note'?'later':(k==='self'?'req':k);}
+
+/* ───────── State ───────── */
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+let flow=FLOWS[0], idx=0, playing=false, speed=1, run=0, holdTimer=null, holdRaf=null;
+const el={flows:document.getElementById('flows'),fhead:document.getElementById('fhead'),detail:document.getElementById('detail'),ledger:document.getElementById('ledger'),
+ counter:document.getElementById('counter'),play:document.getElementById('btnPlay'),playText:document.getElementById('playText'),playIcon:document.getElementById('playIcon'),
+ prev:document.getElementById('btnPrev'),next:document.getElementById('btnNext'),restart:document.getElementById('btnRestart'),bar:document.getElementById('bar'),scroll:document.getElementById('mapScroll')};
+
+/* Flow list */
+(function(){
+  const groups={};FLOWS.forEach(function(f){(groups[f.g]=groups[f.g]||[]).push(f);});
+  Object.keys(groups).forEach(function(g){
+    const box=document.createElement('div');box.className='fgroup';
+    const h=document.createElement('h4');h.textContent=g;box.appendChild(h);
+    groups[g].forEach(function(f){const b=document.createElement('button');b.type='button';b.className='fbtn';b.dataset.id=f.id;
+      const t=document.createElement('span');t.textContent=f.n;const c=document.createElement('small');c.textContent=f.s.length+' steps';b.append(t,c);
+      b.addEventListener('click',function(){selectFlow(f.id,true);});box.appendChild(b);});
+    el.flows.appendChild(box);
+  });
+})();
+
+function nodesOf(f){const s=new Set();f.s.forEach(function(st){st.p.forEach(function(p){s.add(p);});});return s;}
+
+function selectFlow(id,push){
+  const f=FLOWS.find(function(x){return x.id===id;})||FLOWS[0];
+  flow=f;idx=0;stopPlay();
+  [].forEach.call(el.flows.querySelectorAll('.fbtn'),function(b){b.setAttribute('aria-current',b.dataset.id===f.id?'true':'false');});
+  el.fhead.innerHTML='';
+  const h=document.createElement('h2');h.textContent=f.n;
+  const p=document.createElement('p');p.textContent=f.sum;
+  const m=document.createElement('div');m.className='meta';
+  [['Starts',f.starts],['Ends',f.ends],['Steps',String(f.s.length)]].forEach(function(r){const s=document.createElement('span');const b=document.createElement('b');b.textContent=r[0];s.append(b,document.createTextNode(r[1]));m.appendChild(s);});
+  el.fhead.append(h,p,m);
+  const used=nodesOf(f);
+  Object.keys(NODES).forEach(function(k){NODES[k].g.classList.toggle('dim',!used.has(k));});
+  el.ledger.innerHTML='';
+  f.s.forEach(function(st,i){const li=document.createElement('li');if(st.k==='err')li.classList.add('k-err');
+    const b=document.createElement('button');b.type='button';
+    const n=document.createElement('span');n.className='n';n.textContent=String(i+1).padStart(2,'0');
+    const t=document.createElement('span');t.className='lt';t.textContent=st.t;const sm=document.createElement('small');sm.textContent=st.l;t.appendChild(sm);
+    b.append(n,t);b.addEventListener('click',function(){stopPlay();go(i);});li.appendChild(b);el.ledger.appendChild(li);});
+  if(push){try{history.replaceState(null,'','#'+f.id);}catch(e){location.hash=f.id;}}
+  go(0);
+}
+
+function drawPast(){
+  gPast.innerHTML='';
+  for(let i=0;i<idx;i++){const st=flow.s[i];if(st.p.length<2)continue;
+    for(let j=0;j<st.p.length-1;j++){const sg=seg(st.p[j],st.p[j+1]);S('path',{d:sg.d,class:'trail past '+kindClass(st.k)},gPast);}}
+}
+
+function renderDetail(st){
+  const d=el.detail;d.innerHTML='';d.classList.remove('step-in');void d.offsetWidth;d.classList.add('step-in');
+  const top=document.createElement('div');top.className='step-k';
+  const k=document.createElement('span');k.className='kind '+st.k;
+  k.textContent={req:'Request',res:'Response',self:'Inside '+NODES[st.p[0]].t,err:'Refused',later:'Once email is on',note:'Note'}[st.k];
+  const r=document.createElement('span');r.className='route';r.textContent=st.p.map(function(p){return NODES[p].t;}).join('  →  ');
+  top.append(k);if(st.p.length>1)top.append(r);
+  const h=document.createElement('h3');h.textContent=(idx+1)+'. '+st.t;
+  d.append(top,h);
+  if(st.d){const p=document.createElement('div');p.className='desc';const pp=document.createElement('p');pp.textContent=st.d;p.appendChild(pp);d.appendChild(p);}
+  if(st.f){const w=document.createElement('div');w.className='where';const kk=document.createElement('span');kk.className='k';kk.textContent='In the code';w.appendChild(kk);
+    const c=document.createElement('code');c.className='file';c.textContent=st.f;w.appendChild(c);d.appendChild(w);}
+  if(st.x){const l=document.createElement('span');l.className='plabel';l.textContent='What is sent or stored';const pre=document.createElement('pre');pre.className='payload';pre.textContent=st.x;d.append(l,pre);}
+  if(st.w){const f=document.createElement('div');f.className='fail';const b=document.createElement('b');b.textContent='What can go wrong';f.append(b,document.createTextNode(st.w));d.appendChild(f);}
+}
+
+function updateChrome(){
+  el.counter.innerHTML='';const b=document.createElement('b');b.textContent='Step '+(idx+1);el.counter.append(b,document.createTextNode(' of '+flow.s.length));
+  el.prev.disabled=idx===0;el.next.disabled=idx===flow.s.length-1;
+  [].forEach.call(el.ledger.children,function(li,i){li.classList.toggle('cur',i===idx);li.classList.toggle('done',i<idx);});
+}
+
+function setNodeStates(st){
+  Object.keys(NODES).forEach(function(k){const g=NODES[k].g;g.classList.remove('on','res','err');});
+  st.p.forEach(function(p){const g=NODES[p].g;g.classList.add('on');if(st.k==='res')g.classList.add('res');if(st.k==='err')g.classList.add('err');});
+}
+
+function scrollMapTo(id){
+  const sc=el.scroll;if(sc.scrollWidth<=sc.clientWidth+2)return;
+  const c=C(id),x=c.x/1000*svg.getBoundingClientRect().width;
+  sc.scrollTo({left:Math.max(0,x-sc.clientWidth/2),behavior:reduce?'auto':'smooth'});
+}
+
+function chip(parent,text,x,y,cls){
+  const g=S('g',{class:'pk '+cls},parent);
+  const t=S('text',{x:0,y:0,class:'chip-t','text-anchor':'middle'},g);t.textContent=text;
+  let w=text.length*6.6+14;try{w=t.getComputedTextLength()+16;}catch(e){}
+  const r=S('rect',{x:-w/2,y:-13,width:w,height:19,rx:9.5,class:'chip-bg'},g);g.insertBefore(r,t);t.setAttribute('y','0.5');
+  g.setAttribute('transform','translate('+x+','+y+')');return g;
+}
+
+function animateStep(st,done){
+  const my=++run;gNow.innerHTML='';gPk.innerHTML='';
+  setNodeStates(st);scrollMapTo(st.p[st.p.length-1]);
+  const cls=kindClass(st.k);
+  if(st.p.length<2){
+    const n=NODES[st.p[0]];
+    if(st.k!=='note'){S('rect',{x:n.x-5,y:n.y-5,width:n.w+10,height:NH+10,rx:13,class:'work'+(st.k==='err'?' err':'')},gNow);}
+    chip(gPk,st.l,n.x+n.w/2,n.y-12,cls);
+    const hold=reduce?0:900/speed;setTimeout(function(){if(my===run)done();},hold);return;
+  }
+  const segs=[];for(let j=0;j<st.p.length-1;j++)segs.push(seg(st.p[j],st.p[j+1]));
+  const paths=segs.map(function(sg){const p=S('path',{d:sg.d,class:'trail '+cls+(st.k==='later'?' done':''),'marker-end':'url(#ah-'+cls+')'},gNow);const L=p.getTotalLength();p.style.strokeDasharray=st.k==='later'?'6 5':L+' '+L;if(st.k!=='later')p.style.strokeDashoffset=reduce?0:L;p._L=L;return p;});
+  const pk=S('g',{class:'pk '+cls},gPk);S('circle',{r:7,cx:0,cy:0},pk);
+  const lab=chip(gPk,st.l,0,0,cls);
+  const segDur=reduce?0:Math.max(380,Math.min(900,segs.length>2?560:760))/speed;
+  let j=0;
+  function place(pt){pk.setAttribute('transform','translate('+pt.x.toFixed(1)+','+pt.y.toFixed(1)+')');lab.setAttribute('transform','translate('+pt.x.toFixed(1)+','+(pt.y-16).toFixed(1)+')');}
+  function ping(id){const n=NODES[id];const r=S('rect',{x:n.x,y:n.y,width:n.w,height:NH,rx:10,class:'ping'},gNow);if(st.k==='res')r.style.stroke='var(--brass)';if(st.k==='err')r.style.stroke='var(--ember)';setTimeout(function(){r.remove();},1200);}
+  function stepSeg(){
+    if(my!==run)return;
+    if(j>=segs.length){place(segs[segs.length-1].p1);done();return;}
+    const sg=segs[j],p=paths[j],t0=performance.now();
+    if(segDur===0){if(st.k!=='later')p.style.strokeDashoffset=0;place(sg.p1);j++;stepSeg();return;}
+    (function frame(now){
+      if(my!==run)return;
+      let t=Math.min(1,(now-t0)/segDur);const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+      place(qpt(sg,e));if(st.k!=='later')p.style.strokeDashoffset=p._L*(1-e);
+      if(t<1)requestAnimationFrame(frame);else{if(!reduce)ping(st.p[j+1]);j++;setTimeout(stepSeg,reduce?0:120/speed);}
+    })(t0);
+  }
+  place(segs[0].p0);stepSeg();
+}
+
+function clearHold(){if(holdTimer){clearTimeout(holdTimer);holdTimer=null;}if(holdRaf){cancelAnimationFrame(holdRaf);holdRaf=null;}el.bar.style.width='0';}
+
+function go(i){
+  clearHold();idx=Math.max(0,Math.min(flow.s.length-1,i));
+  const st=flow.s[idx];
+  drawPast();renderDetail(st);updateChrome();
+  animateStep(st,function(){if(playing)scheduleNext();});
+}
+
+function readTime(st){const n=(st.t+' '+(st.d||'')+' '+(st.w||'')).length;return Math.max(2600,Math.min(8000,1600+n*30))/speed;}
+function scheduleNext(){
+  clearHold();
+  if(idx>=flow.s.length-1){stopPlay();el.playText.textContent='Replay';return;}
+  const dur=readTime(flow.s[idx]),t0=performance.now();
+  (function tick(now){const t=Math.min(1,(now-t0)/dur);el.bar.style.width=(t*100).toFixed(1)+'%';if(t<1)holdRaf=requestAnimationFrame(tick);})(t0);
+  holdTimer=setTimeout(function(){go(idx+1);},dur);
+}
+function setPlayUI(){el.playText.textContent=playing?'Pause':'Play';el.playIcon.innerHTML=playing?'<path d="M3 2h4v12H3zM9 2h4v12H9z"/>':'<path d="M4 2v12l10-6z"/>';el.play.setAttribute('aria-pressed',playing?'true':'false');}
+function startPlay(){if(idx>=flow.s.length-1&&el.playText.textContent==='Replay'){playing=true;setPlayUI();go(0);return;}playing=true;setPlayUI();scheduleNext();}
+function stopPlay(){playing=false;clearHold();setPlayUI();}
+
+el.play.addEventListener('click',function(){playing?stopPlay():startPlay();});
+el.prev.addEventListener('click',function(){stopPlay();go(idx-1);});
+el.next.addEventListener('click',function(){stopPlay();go(idx+1);});
+el.restart.addEventListener('click',function(){stopPlay();go(0);});
+[].forEach.call(document.querySelectorAll('.speed button'),function(b){b.addEventListener('click',function(){speed=parseFloat(b.dataset.s);
+  [].forEach.call(document.querySelectorAll('.speed button'),function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});
+  try{localStorage.setItem('flows:speed',String(speed));}catch(e){}
+  if(playing)scheduleNext();});});
+try{const sv=parseFloat(localStorage.getItem('flows:speed'));if(sv===0.5||sv===2){speed=sv;[].forEach.call(document.querySelectorAll('.speed button'),function(x){x.setAttribute('aria-pressed',parseFloat(x.dataset.s)===sv?'true':'false');});}}catch(e){}
+document.addEventListener('keydown',function(e){
+  const tag=(e.target&&e.target.tagName)||'';if(/INPUT|TEXTAREA|SELECT/.test(tag))return;
+  if(e.target&&e.target.closest&&e.target.closest('.node'))return;
+  if(e.key==='ArrowRight'){e.preventDefault();stopPlay();go(idx+1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopPlay();go(idx-1);}
+  else if(e.key===' '&&!/BUTTON/.test(tag)){e.preventDefault();playing?stopPlay():startPlay();}
+});
+window.addEventListener('hashchange',function(){const id=location.hash.slice(1);if(id&&id!==flow.id&&FLOWS.some(function(f){return f.id===id;}))selectFlow(id,false);});
+const startId=(location.hash||'').slice(1);
+selectFlow(FLOWS.some(function(f){return f.id===startId;})?startId:'add',false);
+})();
+</script>
+
+</body>
+</html>
