@@ -123,6 +123,31 @@ receipts go under `receipts/<lid>/`.
 The v1 table `expense-track-pro-<stage>` stays (retained, no longer written)
 until v2 has been verified in every stage; remove it in a later release.
 
+## Is one table the right call?
+
+Yes, for this app's access patterns — with a clear trade-off.
+
+- **Scaling:** DynamoDB scales per partition key, not per table; more tables
+  would add no capacity. Households are small, independent partitions. One
+  table keeps transactions across entity types (ownership handover), IAM,
+  backups and alarms simple.
+- **Querying:** every pattern the app needs is designed into the keys and
+  costs one partition read. Unplanned questions (cross-household analytics,
+  "spend by city") need a new GSI or a scan, and there is no server-side
+  aggregation; totals are computed in the browser.
+- **If that changes:** for analytics, add DynamoDB export to S3 and query it
+  with Athena (no load on the live table). Move to PostgreSQL only if
+  server-side reporting, rich filtering or full-text search becomes a core
+  feature.
+
+### Known limits and their fixes
+
+| Limit | When it matters | Fix |
+|---|---|---|
+| `GSI1PK = LEDGERS` lists every household under one key; scheduled jobs walk it sequentially | ~100k+ households | Write `LEDGERS#<0..N>` (hash of lid) and fan the jobs out per shard; migrate existing META items |
+| App loads a household's whole expense list | ~10k+ entries in one household | Page by period with `GET /expenses?start=&end=` (GSI2 exists) |
+| `DUE#<yyyy-mm>` holds every active rule due that month | very large rule counts | Suffix by day or shard |
+
 ## Scale notes
 
 - On-demand capacity: no sizing; idle stages cost nothing.

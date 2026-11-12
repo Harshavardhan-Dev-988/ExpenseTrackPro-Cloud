@@ -100,7 +100,11 @@ flowchart LR
         COG[Cognito User Pool<br/>+ Hosted domain for OAuth]
         APIGW[API Gateway HTTP API<br/>JWT authorizer]
         L[Lambda<br/>FastAPI + Mangum]
-        DDB[(DynamoDB<br/>expense-track-pro-dev)]
+        J[Jobs Lambda<br/>recurring · alerts · summary]
+        M[Migrate Lambda<br/>CDK Trigger, after each deploy]
+        EB[EventBridge<br/>3 schedules]
+        DDB[(DynamoDB<br/>expense-track-pro-v2-dev<br/>GSI1 lookups · GSI2 by date)]
+        SES[SES<br/>off until a domain is verified]
         S3R[(S3 receipts bucket<br/>private)]
         SM[Secrets Manager]
         CW[CloudWatch alarms] --> SNS[SNS → email]
@@ -116,6 +120,9 @@ flowchart LR
     UI -->|Bearer ID token| APIGW
     APIGW -->|verified claims| L
     L --> DDB
+    EB --> J --> DDB
+    J -.when enabled.-> SES
+    M -->|schema migrations| DDB
     L -->|presign PUT/GET| S3R
     UI -->|PUT/GET via presigned URL| S3R
     SM -.resolved at deploy.-> COG
@@ -126,16 +133,18 @@ flowchart LR
 **Request lifecycle (a normal API call):**
 
 1. The browser gets an **ID token** from Amplify (`fetchAuthSession()`), which was issued by Cognito at sign-in.
-2. `services/cloudApi.ts` calls the API with `Authorization: Bearer <idToken>`.
+2. `services/cloudApi.ts` calls the API with `Authorization: Bearer <idToken>` and `X-Ledger-Id: <household>`.
 3. API Gateway's **JWT authorizer** verifies the token's signature, issuer (the user pool) and audience (the app client id) **before** Lambda runs. Invalid/missing token → `401` from API Gateway; the Lambda is never invoked.
-4. Mangum hands the request to FastAPI. `dependencies/auth.py:get_user_id` reads the already-verified `sub` claim from the event — that is the user id every DynamoDB item is scoped to.
-5. The router reads/writes the user's partition (`PK = USER#<sub>`) and returns JSON in the same camelCase shape as the frontend's TypeScript types.
+4. Mangum hands the request to FastAPI. `dependencies/auth.py:get_identity` reads the already-verified `sub`, email and email-verified claims from the event.
+5. `dependencies/ledger.py` checks membership with one `GetItem` (`LEDGER#<lid>` / `MEMBER#<sub>`) and the role the route needs (viewer, editor or owner). The household id from the client is never trusted on its own.
+6. The router reads/writes the household's partition (`PK = LEDGER#<lid>`) and returns JSON in the same camelCase shape as the frontend's TypeScript types.
 
 **Design decisions worth knowing:**
 
 - **One Lambda for the whole API.** Simple to deploy and keeps cold starts to one function. Routing happens inside FastAPI.
 - **Auth is enforced at the gateway, not in Python.** Routes only ask "who is this?", never "is this valid?". The two unauthenticated routes (`/health`, `/whatsapp/webhook`) are explicit literal routes that take precedence over the authorized `/{proxy+}` catch-all.
-- **Single-table DynamoDB.** Every query is "one partition", so there are no GSIs. See [§7](#7-data-model-dynamodb--s3).
+- **Single-table DynamoDB, keyed by household.** Each household's data is one partition; two overloaded, sparse GSIs cover the cross-cutting lookups (memberships, invites, due bills, date ranges). No scans in request paths. Why one table, and its trade-offs: [§7](#why-a-single-table).
+- **Schema changes are code.** Numbered migrations run automatically after each Api deploy, exactly once per table; they only write what's absent, so re-runs never overwrite users' changes.
 - **Files never pass through Lambda.** Receipts go browser ⇄ S3 directly via 5-minute presigned URLs.
 - **Secrets never appear in templates or git.** CDK emits `{{resolve:secretsmanager:...}}` dynamic references; CloudFormation resolves them at deploy time.
 
@@ -214,12 +223,12 @@ flowchart LR
 | Stack | Depends on | What it creates | Outputs |
 |---|---|---|---|
 | `ExpenseTrack-Auth-<stage>` | — | Cognito User Pool `expense-track-pro-<stage>`, hosted domain `expense-track-pro-<stage>.auth.ap-southeast-2.amazoncognito.com`, Google + Facebook identity providers, SPA app client, branded verification email | `UserPoolId`, `UserPoolClientId`, `HostedUiDomainUrl` |
-| `ExpenseTrack-Data-<stage>` | — | DynamoDB table `expense-track-pro-<stage>` (PK/SK, on-demand, TTL attr `ttl`, PITR in prod only); S3 bucket `expense-track-pro-receipts-<stage>-<account>` (private, SSE-S3, CORS for the app origins) | `TableName`, `ReceiptsBucketName` |
-| `ExpenseTrack-Api-<stage>` | Auth, Data | Lambda (Python 3.12, 256 MB, 15 s) with read/write grants on the table and bucket; HTTP API `expense-track-pro-<stage>` with Cognito authorizer, CORS and three routes | `ApiUrl` |
+| `ExpenseTrack-Data-<stage>` | — | DynamoDB table `expense-track-pro-v2-<stage>` (PK/SK + GSI1 + GSI2, on-demand, TTL attr `ttl`, PITR on, deletion protection in prod); retained schema-v1 table `expense-track-pro-<stage>`; S3 bucket `expense-track-pro-receipts-<stage>-<account>` (private, SSE-S3, CORS for the app origins) | `TableName`, `LegacyTableName`, `ReceiptsBucketName` |
+| `ExpenseTrack-Api-<stage>` | Auth, Data | API Lambda (Python 3.12, 256 MB, 15 s) with read/write grants on the table and bucket; HTTP API `expense-track-pro-<stage>` with Cognito authorizer, CORS and three routes; jobs Lambda (5 min) on three EventBridge schedules (recurring 00:30 IST daily, budget alerts 20:00 IST daily, monthly summary 09:00 IST on the 1st) with `ses:SendEmail`; migrate Lambda run by a CDK Trigger after every API update | `ApiUrl` |
 | `ExpenseTrack-Monitoring-<stage>` | Api | SNS topic `expense-track-pro-alerts-<stage>` with an email subscription; 5 CloudWatch alarms | — |
 | `ExpenseTrack-Frontend-<stage>` | — | Private S3 site bucket `expense-track-pro-site-<stage>-<account>`, CloudFront distribution (OAC, HTTPS redirect, SPA fallback of 403/404 → `/index.html`), `BucketDeployment` of `frontend/dist-aws` with a `/*` invalidation | `SiteUrl`, `SiteBucketName` |
 
-**Removal policies:** in non-prod stages the table, buckets and user pool are `DESTROY` (and buckets auto-empty), so `cdk destroy` cleans up fully. In `prod` they are `RETAIN`.
+**Removal policies:** in non-prod stages the v2 table, buckets and user pool are `DESTROY` (and buckets auto-empty), so `cdk destroy` cleans up fully. In `prod` they are `RETAIN`. The schema-v1 table is `RETAIN` in every stage until it's deliberately removed.
 
 **Currently deployed (dev):**
 
@@ -229,7 +238,7 @@ flowchart LR
 | API URL | `https://hbsqcepav7.execute-api.ap-southeast-2.amazonaws.com` |
 | User pool / client | `ap-southeast-2_f6zD79Um0` / `4m6v1tcrennnmftkvvhvkbilnv` |
 | Cognito domain | `https://expense-track-pro-dev.auth.ap-southeast-2.amazoncognito.com` |
-| Table | `expense-track-pro-dev` |
+| Table | `expense-track-pro-v2-dev` (v1 `expense-track-pro-dev` retained) |
 | Receipts bucket | `expense-track-pro-receipts-dev-719312763274` |
 | Site | `https://d3bttra9tv41h7.cloudfront.net` (bucket `expense-track-pro-site-dev-719312763274`) |
 | Alerts topic | `expense-track-pro-alerts-dev` → `harshareddyi2u@gmail.com` |
@@ -244,7 +253,7 @@ flowchart LR
 
 `OPTIONS` is deliberately *not* routed — API Gateway's built-in CORS responder answers preflights. Routing `ANY` would send preflights through the authorizer and break every cross-origin request.
 
-**CORS:** allowed origins are `http://localhost:5173`, `http://localhost:5193` and the CloudFront URL; methods GET/POST/PUT/DELETE/OPTIONS; headers `Authorization`, `Content-Type`. The same origin list also appears in FastAPI's `CORSMiddleware` (for local uvicorn) and the receipts bucket CORS rules — keep the three in sync.
+**CORS:** allowed origins are `http://localhost:5173`, `http://localhost:5193` and the CloudFront URL; methods GET/POST/PUT/DELETE/OPTIONS; headers `Authorization`, `Content-Type`, `X-Ledger-Id`. The same origin list also appears in FastAPI's `CORSMiddleware` (for local uvicorn) and the receipts bucket CORS rules — keep the three in sync.
 
 ### Lambda environment variables
 
@@ -441,6 +450,29 @@ The full design, the reasoning and how to migrate are in **[docs/data-model.md](
 | Applied migration | `SYSTEM` | `MIGRATION#<nnn>` |
 
 The schema-v1 table `expense-track-pro-<stage>` (everything under `USER#<sub>`, no indexes) is kept read-only and retained until v2 is verified everywhere; migration `001` copied it into v2 automatically on deploy.
+
+<a id="why-a-single-table"></a>
+### Why a single table (and what it costs)
+
+**Scaling — a strength.** DynamoDB scales by partition key, not by table count, so splitting entities into separate tables wouldn't add capacity. Each household is a small, independent item collection; a million families is a million small partitions. One table also keeps multi-entity transactions (e.g. ownership handover), IAM, backups and alarms in one place.
+
+**Ad-hoc querying — the trade-off.** Every access pattern the app has is "this household, maybe a date range", which is exactly what the keys are built for. Questions nobody designed for (e.g. "average grocery spend across all households") need a new GSI or a scan, and there's no server-side `SUM`/`GROUP BY` — dashboard totals are computed in the browser.
+
+**When to reach for something else**
+
+| If the product needs… | Use |
+|---|---|
+| Analytics / ad-hoc SQL over all data | Keep DynamoDB for the app; add DynamoDB **export to S3 + Athena** (no load on the live table) |
+| Heavy server-side reporting, rich filters, full-text search, evolving relationships | **PostgreSQL** (RDS/Aurora) — at the cost of sizing, patching and Lambda connection management |
+| Neither | Stay as is |
+
+**Known scale limits (fine today)**
+
+| Limit | Shows up at | Fix |
+|---|---|---|
+| All households listed under one GSI1 key (`LEDGERS`); daily jobs walk it sequentially | ~100k+ households | Shard the key (`LEDGERS#0..N`) and process shards in parallel — a small migration |
+| The app downloads a household's full expense history on open | ~10k+ entries in one household | Load by period using `GET /expenses?start=&end=` (GSI2 is already in place) |
+| `DUE#<yyyy-mm>` holds every active rule due that month | Very large rule counts | Add a day or shard suffix to the key |
 
 ### S3 — receipts bucket
 
@@ -906,7 +938,8 @@ Everything is serverless and pay-per-use (Lambda, HTTP API, on-demand DynamoDB, 
 - Frontend config (pool ids, API URL) is hard-coded rather than injected per stage via `import.meta.env`.
 - Cognito uses the default email sender (50 emails/day); move to SES for production.
 - Tokens live in localStorage (Amplify default). Consider cookie storage, shorter token lifetimes, and refresh-token rotation for a production launch.
-- The app still loads a household's whole expense list; the date-range API is there for paging by period when households get very large.
+- The app still loads a household's whole expense list, and the scheduled jobs walk one `LEDGERS` index key; both are fine now and have planned fixes (see [Known scale limits](#why-a-single-table)).
+- No server-side aggregation or ad-hoc querying; add DynamoDB export to S3 + Athena if analytics are needed.
 - The schema-v1 table is retained after the v2 migration; delete it (and `LEGACY_TABLE_NAME`) in a later release once v2 is verified everywhere.
 - Emails are built but not sent until a domain is verified in SES; invites are in-app only until then.
 - Offline mode queues new expenses only; editing synced entries needs a connection.
