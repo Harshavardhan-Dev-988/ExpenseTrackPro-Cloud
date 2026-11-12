@@ -1,0 +1,22 @@
+# macOS Finder metadata
+.DS_Store
+._*
+
+# Secrets and local credentials — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+.aws/
+credentials
+
+# Build output and tooling caches
+node_modules/
+cdk.out/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
